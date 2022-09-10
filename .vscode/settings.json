@@ -5,5 +5,6 @@
         "/home/ita/GitHub/subnetooor/src/libs/",
         "/home/ita/GitHub/secp256k1/include/",
         "/home/ita/GitHub/ethash/include/"
-    ]
+    ],
+    "C_Cpp.default.cppStandard": "c++17"
 }

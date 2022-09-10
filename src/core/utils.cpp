@@ -3,7 +3,7 @@
 std::mutex log_lock;
 std::mutex debug_mutex;
 
-void Utils::logToFile(std::string str) {
+void Utils::logToFile(const std::string& str) {
   log_lock.lock();
   std::ofstream log("log.txt", std::ios::app);
   log << str << std::endl;
@@ -11,7 +11,7 @@ void Utils::logToFile(std::string str) {
   log_lock.unlock();
 }
 
-void Utils::LogPrint(const std::string &prefix, std::string function, std::string data) {
+void Utils::LogPrint(const std::string &prefix, const std::string &function,const  std::string &data) {
   debug_mutex.lock();
   std::ofstream log("debug.txt", std::ios::app);
   log << prefix << function << " - " << data << std::endl;

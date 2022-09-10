@@ -122,11 +122,7 @@ std::string Block::getBlockHash() const {
 }
 
 uint64_t Block::blockSize() const {
-  uint64_t ret = 32 + 8 + 8 + 4; // prevBlockHash + timestamp + nHeight + txCount
-  for (auto const &transaction : this->_transactions) { // + [ txSize, tx, ... ]
-    ret += 4 + transaction.second.serialize().size();
-  }
-  return ret;
+  return this->serializeToBytes(false).size();
 }
 
 bool Block::appendTx(const Tx::Base &tx) {

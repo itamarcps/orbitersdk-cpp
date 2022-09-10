@@ -48,8 +48,8 @@ namespace MessagePrefix {
 enum BlockStatus { Unknown, Processing, Rejected, Accepted };
 
 namespace Utils {
-  void logToFile(std::string str);
-  void LogPrint(const std::string &prefix, std::string function, std::string data);
+  void logToFile(const std::string &str);
+  void LogPrint(const std::string &prefix, const std::string &function,const std::string &data);
   void sha3(const std::string &input, std::string &output);
   std::string uint256ToBytes(const uint256_t &i);
   std::string uint160ToBytes(const uint160_t &i);
