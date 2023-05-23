@@ -42,18 +42,25 @@ Storage::Storage(const std::unique_ptr<DB>& db, const std::unique_ptr<Options>& 
     this->pushFrontInternal(std::move(block));
   }
 
+  // Start the periodic save thread
+  Utils::logToDebug(Log::storage, __func__, "Starting blockchain periodic save thread");
+  this->periodicSaveToDB();
   Utils::logToDebug(Log::storage, __func__, "Blockchain successfully loaded");
 }
 
 Storage::~Storage() {
+  // Stop the periodic save thread so we can save manually without interference
+  Utils::logToDebug(Log::storage, __func__, "Stopping blockchain periodic save thread");
+  this->stopPeriodicSaveToDB();
+
+  Utils::logToDebug(Log::storage, __func__, "Saving blockchain to database");
   DBBatch blockBatch, heightBatch, txToBlockBatch;
   std::shared_ptr<const Block> latest;
   {
     std::unique_lock<std::shared_mutex> lock(this->chainLock);
     latest = this->chain.back();
     while (!this->chain.empty()) {
-      // Batch block to be saved to the database.
-      // We can't call this->popBack() because of the mutex
+      // Batch block to be saved to the database (older blocks first)
       std::shared_ptr<const Block> block = this->chain.front();
       blockBatch.puts.emplace_back(DBEntry(
         block->hash().get(), block->serializeBlock()
@@ -66,12 +73,15 @@ Storage::~Storage() {
       auto Txs = block->getTxs();
       for (uint32_t i = 0; i < Txs.size(); i++) {
         const auto TxHash = Txs[i].hash();
-        std::string value = block->hash().get() + Utils::uint32ToBytes(i) + Utils::uint64ToBytes(block->getNHeight());
+        std::string value = block->hash().get()
+          + Utils::uint32ToBytes(i)
+          + Utils::uint64ToBytes(block->getNHeight());
         txToBlockBatch.puts.emplace_back(DBEntry(TxHash.get(), value));
         this->txByHash.erase(TxHash);
       }
 
-      // Delete block from internal mappings and the chain
+      // Delete block from internal mappings and the chain.
+      // We can't call this->popFront() because of the mutex
       this->blockByHash.erase(block->hash());
       this->chain.pop_front();
     }
@@ -82,6 +92,7 @@ Storage::~Storage() {
   this->db->putBatch(heightBatch, DBPrefix::blockHeightMaps);
   this->db->putBatch(txToBlockBatch, DBPrefix::txToBlocks);
   this->db->put("latest", latest->serializeBlock(), DBPrefix::blocks);
+  Utils::logToDebug(Log::storage, __func__, "Blockchain successfully saved");
 }
 
 void Storage::initializeBlockchain() {
@@ -417,18 +428,86 @@ void Storage::periodicSaveToDB() {
   while (!this->stopPeriodicSave) {
     std::this_thread::sleep_for(std::chrono::seconds(this->periodicSaveCooldown));
     if (!this->stopPeriodicSave &&
-      (this->cachedBlocks.size() > 1000 || this->cachedTxs.size() > 1000000)
+      (this->cachedBlocks.size() >= 1000 || this->cachedTxs.size() >= 1000000)
     ) {
-      // TODO: Properly implement periodic save to DB, saveToDB() function saves **everything** to DB.
-      // Requirements:
-      // 1. Save up to 50% of current block list size to DB (e.g. 500 blocks if there are 1000 blocks).
-      // 2. Save all tx references existing on these blocks to DB.
-      // 3. Check if block is **unique** to Storage class (use shared_ptr::use_count()), if it is, save it to DB.
-      // 4. Take max 1 second, Storage::periodicSaveToDB() should never lock this->chainLock for too long, otherwise chain might stall.
-      // use_count() of blocks inside Storage would be 2 if on chain (this->chain + this->blockByHash) and not being used anywhere else on the program.
-      // or 1 if on cache (cachedBlocks).
-      // if ct > 3 (or 1), we have to wait until whoever is using the block
-      // to stop using it so we can save it.
+      DBBatch blockBatch, heightBatch, txToBlockBatch;
+      int blockCt = 0, blockNum = 0;
+      std::chrono::time_point<std::chrono::system_clock> timeStart;
+      int timeDiff = 0;
+      {
+        // Save 50% of current chain size to DB (e.g. 500 blocks if there are 1000 blocks).
+        // Minimum required for this is 2 blocks in chain - if either the chain
+        // is empty or it only has 1 block ("latest"), skip saving for now.
+        std::unique_lock<std::shared_mutex> lock(this->chainLock);
+        blockCt = (this->chain.size() / 2);
+        if (blockCt == 0) continue;
+        Utils::logToDebug(Log::storage, __func__, "Saving " + std::to_string(blockCt) + " blocks to DB");
+
+        // Save all tx references existing on these blocks to DB.
+        // This should take 1 second tops - we should never lock the chainLock
+        // mutex for too long, otherwise the chain might stall.
+        timeStart = std::chrono::system_clock::now();
+        while (blockNum < blockCt) {
+          // Check if block is unique to Storage class (using shared_ptr::use_count()).
+          // use_count() of blocks inside Storage would be:
+          // * 2 on chain (this->chain + this->blockByHash) and not used anywhere else, or
+          // * 1 on cache (cachedBlocks).
+          // If use_count() > 3 (or 1), we have to wait until whoever is using
+          // the block stops using it so we can save it to the DB.
+          // If we wait too long, abort the save process altogether so the
+          // mutex unlocks itself at the end of the scope.
+          std::shared_ptr<const Block> block = this->chain.front();
+          while (block.use_count() == 1 || block.use_count() > 3) {
+            timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::system_clock::now() - timeStart
+            ).count();
+            if (timeDiff >= 1000) break; // Inner while (use_count())
+            std::this_thread::sleep_for(std::chrono::milliseconds(1)); // Check again each 1ms
+          }
+          timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now() - timeStart
+          ).count();
+          if (timeDiff >= 1000) break; // Outer while (blockNum < blockCt)
+
+          // Batch block to be saved to the database (older blocks first)
+          blockBatch.puts.emplace_back(DBEntry(
+            block->hash().get(), block->serializeBlock()
+          ));
+          heightBatch.puts.emplace_back(DBEntry(
+            Utils::uint64ToBytes(block->getNHeight()), block->hash().get()
+          ));
+
+          // Batch txs to be saved to the database and delete them from the mappings
+          auto Txs = block->getTxs();
+          for (uint32_t i = 0; i < Txs.size(); i++) {
+            const auto TxHash = Txs[i].hash();
+            std::string value = block->hash().get()
+              + Utils::uint32ToBytes(i)
+              + Utils::uint64ToBytes(block->getNHeight());
+            txToBlockBatch.puts.emplace_back(DBEntry(TxHash.get(), value));
+            this->txByHash.erase(TxHash);
+          }
+
+          // Delete block from internal mappings and the chain.
+          // We can't call this->popFront() because of the mutex
+          this->blockByHash.erase(block->hash());
+          this->chain.pop_front();
+          blockNum++;
+        }
+      }
+
+      // Warn in debug if we took too long
+      if (timeDiff >= 1000) Utils::logToDebug(Log::storage, __func__,
+        "Thread took too long to finish, saving what we got so far"
+      );
+
+      // Batch save what we could get to the DB
+      this->db->putBatch(blockBatch, DBPrefix::blocks);
+      this->db->putBatch(heightBatch, DBPrefix::blockHeightMaps);
+      this->db->putBatch(txToBlockBatch, DBPrefix::txToBlocks);
+      Utils::logToDebug(Log::storage, __func__, std::to_string(blockNum) + "blocks successfully saved");
+    } else {
+      Utils::logToDebug(Log::storage, __func__, "Not enough blocks/txs, skipping");
     }
   }
 }

@@ -203,10 +203,10 @@ class Storage {
     /// Get the number of blocks currently in the chain (nHeight of latest block + 1).
     uint64_t currentChainSize();
 
-    /// Start the periodic save thread. TODO: this should be called by the constructor.
+    /// Start the periodic save thread.
     void periodicSaveToDB();
 
-    /// Stop the periodic save thread. TODO: this should be called by the destructor.
+    /// Stop the periodic save thread.
     void stopPeriodicSaveToDB() { this->stopPeriodicSave = true; }
 };
 
