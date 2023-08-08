@@ -46,6 +46,9 @@ class Options {
     /// List of known Discovery nodes.
     const std::vector<std::pair<boost::asio::ip::address, uint64_t>> discoveryNodes;
 
+    /// List of the initial validators of the chain.
+    const std::vector<Address> genesisValidators;
+
   public:
     /**
      * Constructor for a normal node.
@@ -58,12 +61,14 @@ class Options {
      * @param wsPort Websocket server port.
      * @param httpPort HTTP server port.
      * @param discoveryNodes List of known Discovery nodes.
+     * @param genesisValidators List of the initial validators of the chain.
      */
     Options(
       const std::string& rootPath, const std::string& web3clientVersion,
       const uint64_t& version, const uint64_t& chainID,
       const uint16_t& wsPort, const uint16_t& httpPort,
-      const std::vector<std::pair<boost::asio::ip::address, uint64_t>>& discoveryNodes
+      const std::vector<std::pair<boost::asio::ip::address, uint64_t>>& discoveryNodes,
+      const std::vector<Address>& genesisValidators
     );
 
     /**
@@ -84,6 +89,7 @@ class Options {
       const uint64_t& version, const uint64_t& chainID,
       const uint16_t& wsPort, const uint16_t& httpPort,
       const std::vector<std::pair<boost::asio::ip::address, uint64_t>>& discoveryNodes,
+      const std::vector<Address>& genesisValidators,
       const PrivKey& privKey
     );
     
@@ -100,7 +106,8 @@ class Options {
       httpPort(other.httpPort),
       coinbase(other.coinbase),
       isValidator(other.isValidator),
-      discoveryNodes(other.discoveryNodes)
+      discoveryNodes(other.discoveryNodes),
+      genesisValidators(other.genesisValidators)
     {}
 
     /// Getter for `rootPath`.
@@ -151,6 +158,9 @@ class Options {
      * @return The Validator node's private key, or an empty private key if missing.
      */
     const PrivKey getValidatorPrivKey() const;
+
+    /// Getter for `genesisValidators`.
+    const std::vector<Address>& getGenesisValidators() const { return this->genesisValidators; }
 
     /**
      * Load an options.json file from a given path and construct the singleton object.

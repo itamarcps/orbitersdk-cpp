@@ -141,6 +141,7 @@ void initialize(std::unique_ptr<DB>& db,
     db->put(dev1.get(), value, DBPrefix::nativeAccounts);
   }
   std::vector<std::pair<boost::asio::ip::address, uint64_t>> discoveryNodes;
+  std::vector<Address> validatorAddresses;
   options = std::make_unique<Options>(
     folderPath,
     "OrbiterSDK/cpp/linux_x86-64/0.1.2",
@@ -148,7 +149,8 @@ void initialize(std::unique_ptr<DB>& db,
     8080,
     serverPort,
     httpServerPort,
-    discoveryNodes
+    discoveryNodes,
+    validatorAddresses
   );
   storage = std::make_unique<Storage>(db, options);
   p2p = std::make_unique<P2P::ManagerNormal>(boost::asio::ip::address::from_string("127.0.0.1"), rdpos, options, storage, state);

@@ -21,6 +21,17 @@ const std::vector<Hash> validatorPrivKeys {
   Hash(Hex::toBytes("0x426dc06373b694d8804d634a0fd133be18e4e9bcbdde099fce0ccf3cb965492f"))
 };
 
+const std::vector<Address> validatorAddresses {
+  Address(Hex::toBytes("0x1531bfdf7d48555a0034e4647fa46d5a04c002c3")),
+  Address(Hex::toBytes("0xe3dff2cc3f367df7d0254c834a0c177064d7c7f5")),
+  Address(Hex::toBytes("0x24e10d8ebe80abd3d3fddd89a26f08f3888d1380")),
+  Address(Hex::toBytes("0xb5f7152a2589c6cc2535c5facedfc853194d60a5")),
+  Address(Hex::toBytes("0x098ff62812043f5106db718e5c4349111de3b6b4")),
+  Address(Hex::toBytes("0x50d2ce9815e0e2354de7834f6fdd4d6946442a24")),
+  Address(Hex::toBytes("0x7c2b2a0a75e10b49e652d99bba8afee3a6bc78dd")),
+  Address(Hex::toBytes("0x6e67067edc1b4837b67c0b1def689eddee257521"))
+};
+
 // Forward declaration from contractmanager.cpp
 ethCallInfoAllocated buildCallInfo(const Address& addressToCall, const Functor& function, const Bytes& dataToCall);
 
@@ -85,7 +96,8 @@ void initialize(std::unique_ptr<DB>& db,
       8080,
       serverPort,
       9999,
-      discoveryNodes
+      discoveryNodes,
+      validatorAddresses
     );
   } else {
     options = std::make_unique<Options>(
@@ -96,6 +108,7 @@ void initialize(std::unique_ptr<DB>& db,
       serverPort,
       9999,
       discoveryNodes,
+      validatorAddresses,
       validatorKey
     );
   }
@@ -585,7 +598,8 @@ namespace TState {
           8080,
           8090,
           9999,
-          discoveryNodes
+          discoveryNodes,
+          validatorAddresses
       );
       std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery = std::make_unique<P2P::ManagerDiscovery>(
           boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);
@@ -841,7 +855,8 @@ namespace TState {
           8080,
           8090,
           9999,
-          discoveryNodes
+          discoveryNodes,
+          validatorAddresses
       );
       std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery = std::make_unique<P2P::ManagerDiscovery>(
           boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);
@@ -1157,7 +1172,8 @@ namespace TState {
           8080,
           8090,
           9999,
-          discoveryNodes
+          discoveryNodes,
+          validatorAddresses
       );
       std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery = std::make_unique<P2P::ManagerDiscovery>(
           boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);
@@ -1532,7 +1548,8 @@ namespace TState {
           8080,
           8090,
           9999,
-          discoveryNodes
+          discoveryNodes,
+          validatorAddresses
       );
       std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery = std::make_unique<P2P::ManagerDiscovery>(
           boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);
@@ -1925,7 +1942,8 @@ namespace TState {
           8080,
           8090,
           9999,
-          discoveryNodes
+          discoveryNodes,
+          validatorAddresses
       );
       std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery = std::make_unique<P2P::ManagerDiscovery>(
           boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);

@@ -13,6 +13,7 @@ namespace TP2P {
 
   void initializeOptions(std::unique_ptr<Options>& options, std::string folderPath, uint64_t serverPort) {
     std::vector<std::pair<boost::asio::ip::address, uint64_t>> peers;
+    std::vector<Address> addresses;
     options = std::make_unique<Options>(
         folderPath,
         "OrbiterSDK/cpp/linux_x86-64/0.1.2",
@@ -20,7 +21,8 @@ namespace TP2P {
         8080,
         serverPort,
         9999,
-        peers
+        peers,
+        addresses
     );
   }
 
@@ -82,6 +84,7 @@ namespace TP2P {
       db->put(dev1.get(), value, DBPrefix::nativeAccounts);
     }
     std::vector<std::pair<boost::asio::ip::address, uint64_t>> discoveryNodes;
+    std::vector<Address> addresses;
     if (!validatorKey) {
       options = std::make_unique<Options>(
           folderName,
@@ -90,7 +93,8 @@ namespace TP2P {
           8080,
           serverPort,
           9999,
-          discoveryNodes
+          discoveryNodes,
+          addresses
       );
     } else {
       options = std::make_unique<Options>(
@@ -101,6 +105,7 @@ namespace TP2P {
           serverPort,
           9999,
           discoveryNodes,
+          addresses,
           validatorKey
       );
     }

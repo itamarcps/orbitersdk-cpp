@@ -10,6 +10,17 @@
 #include <filesystem>
 #include <utility>
 
+
+/*
+ * Key: 0a0415d68a5ec2df57aab65efc2a7231b59b029bae7ff1bd2e40df9af96418c8 Address: 1531bfdf7d48555a0034e4647fa46d5a04c002c3
+ * Key: b254f12b4ca3f0120f305cabf1188fe74f0bd38e58c932a3df79c4c55df8fa66 Address: e3dff2cc3f367df7d0254c834a0c177064d7c7f5
+ * Key: 8a52bb289198f0bcf141688a8a899bf1f04a02b003a8b1aa3672b193ce7930da Address: 24e10d8ebe80abd3d3fddd89a26f08f3888d1380
+ * Key: 9048f5e80549e244b7899e85a4ef69512d7d68613a3dba828266736a580e7745 Address: b5f7152a2589c6cc2535c5facedfc853194d60a5
+ * Key: 0b6f5ad26f6eb79116da8c98bed5f3ed12c020611777d4de94c3c23b9a03f739 Address: 098ff62812043f5106db718e5c4349111de3b6b4
+ * Key: a69eb3a3a679e7e4f6a49fb183fb2819b7ab62f41c341e2e2cc6288ee22fbdc7 Address: 50d2ce9815e0e2354de7834f6fdd4d6946442a24
+ * Key: d9b0613b7e4ccdb0f3a5ab0956edeb210d678db306ab6fae1e2b0c9ebca1c2c5 Address: 7c2b2a0a75e10b49e652d99bba8afee3a6bc78dd
+ * Key: 426dc06373b694d8804d634a0fd133be18e4e9bcbdde099fce0ccf3cb965492f Address: 6e67067edc1b4837b67c0b1def689eddee257521
+ */
 const std::vector<Hash> validatorPrivKeys {
   Hash(Hex::toBytes("0x0a0415d68a5ec2df57aab65efc2a7231b59b029bae7ff1bd2e40df9af96418c8")),
   Hash(Hex::toBytes("0xb254f12b4ca3f0120f305cabf1188fe74f0bd38e58c932a3df79c4c55df8fa66")),
@@ -19,6 +30,17 @@ const std::vector<Hash> validatorPrivKeys {
   Hash(Hex::toBytes("0xa69eb3a3a679e7e4f6a49fb183fb2819b7ab62f41c341e2e2cc6288ee22fbdc7")),
   Hash(Hex::toBytes("0xd9b0613b7e4ccdb0f3a5ab0956edeb210d678db306ab6fae1e2b0c9ebca1c2c5")),
   Hash(Hex::toBytes("0x426dc06373b694d8804d634a0fd133be18e4e9bcbdde099fce0ccf3cb965492f"))
+};
+
+const std::vector<Address> validatorAddresses {
+  Address(Hex::toBytes("0x1531bfdf7d48555a0034e4647fa46d5a04c002c3")),
+  Address(Hex::toBytes("0xe3dff2cc3f367df7d0254c834a0c177064d7c7f5")),
+  Address(Hex::toBytes("0x24e10d8ebe80abd3d3fddd89a26f08f3888d1380")),
+  Address(Hex::toBytes("0xb5f7152a2589c6cc2535c5facedfc853194d60a5")),
+  Address(Hex::toBytes("0x098ff62812043f5106db718e5c4349111de3b6b4")),
+  Address(Hex::toBytes("0x50d2ce9815e0e2354de7834f6fdd4d6946442a24")),
+  Address(Hex::toBytes("0x7c2b2a0a75e10b49e652d99bba8afee3a6bc78dd")),
+  Address(Hex::toBytes("0x6e67067edc1b4837b67c0b1def689eddee257521"))
 };
 
 // We initialize the blockchain database
@@ -52,11 +74,6 @@ void initialize(std::unique_ptr<DB>& db,
     db->put(Utils::uint64ToBytes(genesis.getNHeight()), genesis.hash().get(), DBPrefix::blockHeightMaps);
     db->put(genesis.hash().get(), genesis.serializeBlock(), DBPrefix::blocks);
 
-    // Populate rdPoS DB with unique rdPoS, not default.
-    for (uint64_t i = 0; i < validatorPrivKeys.size(); ++i) {
-      db->put(Utils::uint64ToBytes(i), Address(Secp256k1::toAddress(Secp256k1::toUPub(validatorPrivKeys[i]))).get(),
-              DBPrefix::rdPoS);
-    }
   }
   std::vector<std::pair<boost::asio::ip::address, uint64_t>> discoveryNodes;
   if (!validatorKey) {
@@ -67,7 +84,8 @@ void initialize(std::unique_ptr<DB>& db,
         8080,
         serverPort,
         9999,
-        discoveryNodes
+        discoveryNodes,
+        validatorAddresses
       );
   } else {
     options = std::make_unique<Options>(
@@ -78,6 +96,7 @@ void initialize(std::unique_ptr<DB>& db,
       serverPort,
       9999,
       discoveryNodes,
+      validatorAddresses,
       validatorKey
     );
   }
@@ -527,7 +546,8 @@ namespace TRdPoS {
           8080,
           8090,
           9999,
-          peers
+          peers,
+          validatorAddresses
         );
       std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery  = std::make_unique<P2P::ManagerDiscovery>(boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);
 
@@ -810,7 +830,8 @@ namespace TRdPoS {
       8080,
       8090,
       9999,
-      discoveryNodes
+      discoveryNodes,
+      validatorAddresses
     );
     std::unique_ptr<P2P::ManagerDiscovery> p2pDiscovery  = std::make_unique<P2P::ManagerDiscovery>(boost::asio::ip::address::from_string("127.0.0.1"), discoveryOptions);
 
