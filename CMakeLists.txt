@@ -96,7 +96,7 @@ include(cmake/CheckSizes.cmake)
 
 # Add AvalancheGo wrapper dependencies if compiling it
 if(BUILD_AVALANCHEGO)
-  find_package(Absl REQUIRED) # Built-in is hardcoded to SHARED, this one to STATIC
+  find_package(absl REQUIRED) # Built-in is hardcoded to SHARED, this one to STATIC
   find_package(Cares REQUIRED)
   find_package(Protobuf 3.12 REQUIRED)
   find_package(GRPC REQUIRED)
@@ -131,43 +131,36 @@ add_subdirectory(tests)
 if(BUILD_AVALANCHEGO)
   file(REMOVE
     "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.grpc.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/appsender.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.grpc.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/messenger.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/http.grpc.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.grpc.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/appsender.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.grpc.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/messenger.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/http.grpc.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/vm.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/appsender.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/messenger.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/http.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/vm.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/appsender.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/messenger.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/http.pb.h"
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/aliasreader.grpc.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/aliasreader.grpc.pb.h"
-    COMMAND "protoc"
-    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
-         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/aliasreader.proto"
+      OUTPUT "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.h"
+      COMMAND "protoc"
+      ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+      --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+      --proto_path="${CMAKE_SOURCE_DIR}/proto"
+      --experimental_allow_proto3_optional
+      "${CMAKE_SOURCE_DIR}/proto/vm.proto"
   )
 
   add_custom_command(
@@ -181,16 +174,6 @@ if(BUILD_AVALANCHEGO)
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/keystore.grpc.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/keystore.grpc.pb.h"
-    COMMAND "protoc"
-    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
-         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/keystore.proto"
-  )
-
-  add_custom_command(
     OUTPUT "${CMAKE_SOURCE_DIR}/proto/messenger.grpc.pb.cc"
            "${CMAKE_SOURCE_DIR}/proto/messenger.grpc.pb.h"
     COMMAND "protoc"
@@ -201,56 +184,46 @@ if(BUILD_AVALANCHEGO)
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/metrics.grpc.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/metrics.grpc.pb.h"
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/runtime.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/runtime.grpc.pb.h"
     COMMAND "protoc"
     ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
          --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
          --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/metrics.proto"
+         "${CMAKE_SOURCE_DIR}/proto/runtime.proto"
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/sharedmemory.grpc.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/sharedmemory.grpc.pb.h"
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/http.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/http.grpc.pb.h"
     COMMAND "protoc"
     ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
          --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
          --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/sharedmemory.proto"
+         "${CMAKE_SOURCE_DIR}/proto/http.proto"
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/rpcdb.grpc.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/rpcdb.grpc.pb.h"
-    COMMAND "protoc"
-    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
-         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/rpcdb.proto"
-  )
-
-  add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.h"
-    COMMAND "protoc"
-    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
-         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         --experimental_allow_proto3_optional
-         "${CMAKE_SOURCE_DIR}/proto/vm.proto"
+      OUTPUT "${CMAKE_SOURCE_DIR}/proto/metrics.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/metrics.grpc.pb.h"
+      COMMAND "protoc"
+      ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+      --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+      --proto_path="${CMAKE_SOURCE_DIR}/proto"
+      "${CMAKE_SOURCE_DIR}/proto/metrics.proto"
   )
 
   # Protobuf PROTOBUF_GENERATE_CPP does NOT work with --experimental_allow_proto3_optional
   # requiring us to go over protobuf files with add_custom_command
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/aliasreader.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/aliasreader.pb.h"
-    COMMAND "protoc"
-    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/aliasreader.proto"
+      OUTPUT "${CMAKE_SOURCE_DIR}/proto/vm.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/vm.pb.h"
+      COMMAND "protoc"
+      ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+      --proto_path="${CMAKE_SOURCE_DIR}/proto"
+      --experimental_allow_proto3_optional
+      "${CMAKE_SOURCE_DIR}/proto/vm.proto"
   )
 
   add_custom_command(
@@ -262,14 +235,6 @@ if(BUILD_AVALANCHEGO)
          "${CMAKE_SOURCE_DIR}/proto/appsender.proto"
   )
 
-  add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/keystore.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/keystore.pb.h"
-    COMMAND "protoc"
-    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/keystore.proto"
-  )
 
   add_custom_command(
     OUTPUT "${CMAKE_SOURCE_DIR}/proto/messenger.pb.cc"
@@ -281,86 +246,59 @@ if(BUILD_AVALANCHEGO)
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/metrics.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/metrics.pb.h"
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/runtime.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/runtime.pb.h"
     COMMAND "protoc"
     ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
          --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/metrics.proto"
+         "${CMAKE_SOURCE_DIR}/proto/runtime.proto"
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/sharedmemory.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/sharedmemory.pb.h"
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/http.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/http.pb.h"
     COMMAND "protoc"
     ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
          --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/sharedmemory.proto"
+         "${CMAKE_SOURCE_DIR}/proto/http.proto"
   )
 
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/rpcdb.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/rpcdb.pb.h"
-    COMMAND "protoc"
-    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/rpcdb.proto"
-  )
-
-  add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/metrics.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/metrics.pb.h"
-    COMMAND "protoc"
-    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         "${CMAKE_SOURCE_DIR}/proto/metrics.proto"
-  )
-
-  add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/proto/vm.pb.cc"
-           "${CMAKE_SOURCE_DIR}/proto/vm.pb.h"
-    COMMAND "protoc"
-    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
-         --proto_path="${CMAKE_SOURCE_DIR}/proto"
-         --experimental_allow_proto3_optional
-         "${CMAKE_SOURCE_DIR}/proto/vm.proto"
+      OUTPUT "${CMAKE_SOURCE_DIR}/proto/metrics.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/metrics.pb.h"
+      COMMAND "protoc"
+      ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+      --proto_path="${CMAKE_SOURCE_DIR}/proto"
+      "${CMAKE_SOURCE_DIR}/proto/metrics.proto"
   )
 
   add_library(ProtoFiles
     "${CMAKE_SOURCE_DIR}/proto/vm.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/appsender.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/messenger.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/http.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/metrics.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/vm.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/appsender.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/messenger.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/http.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/metrics.pb.h"
   )
 
   # You HAVE to set the file names
   add_library (gen-grpc
     "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.grpc.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/appsender.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.grpc.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/messenger.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.grpc.pb.cc"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/http.grpc.pb.cc"
     "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/aliasreader.grpc.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/appsender.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/keystore.grpc.pb.h"
     "${CMAKE_SOURCE_DIR}/proto/messenger.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/sharedmemory.grpc.pb.h"
-    "${CMAKE_SOURCE_DIR}/proto/rpcdb.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/runtime.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/http.grpc.pb.h"
     ${ProtoFiles}
   )
 
