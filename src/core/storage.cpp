@@ -86,18 +86,26 @@ void Storage::initializeBlockchain() {
   if (!this->db->has(std::string("latest"), DBPrefix::blocks)) {
     // Create a new genesis block if one doesn't exist (fresh new blockchain)
     Logger::logToDebug(LogType::INFO, Log::storage, __func__, "No history found, creating genesis block.");
-    Block genesis(Hash(Utils::uint256ToBytes(0)), 1656356645000000, 0);
-
-    // Genesis Keys:
-    // Private: 0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867
-    // Address: 0x00dead00665771855a34155f5e7405489df2c3c6
-    genesis.finalize(PrivKey(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867")), 1656356646000000);
-    this->db->put(std::string("latest"), genesis.serializeBlock(), DBPrefix::blocks);
-    this->db->put(Utils::uint64ToBytes(genesis.getNHeight()), genesis.hash().get(), DBPrefix::blockHeightMaps);
-    this->db->put(genesis.hash().get(), genesis.serializeBlock(), DBPrefix::blocks);
+    const Block& genesisBlock = this->options->getGenesisBlock();
+    this->db->put(std::string("latest"), genesisBlock.serializeBlock(), DBPrefix::blocks);
+    this->db->put(Utils::uint64ToBytes(genesisBlock.getNHeight()), genesisBlock.hash().get(), DBPrefix::blockHeightMaps);
+    this->db->put(this->options->getGenesisBlock().hash().get(), genesisBlock.serializeBlock(), DBPrefix::blocks);
     Logger::logToDebug(LogType::INFO, Log::storage, __func__,
-      std::string("Created genesis block: ") + Hex::fromBytes(genesis.hash().get()).get()
+      std::string("Created genesis block: ") + Hex::fromBytes(genesisBlock.hash().get()).get()
     );
+  } else {
+    // Check if the genesis block match options
+    auto blockHash = Hash(this->db->get(Utils::uint64ToBytes(0), DBPrefix::blockHeightMaps));
+    Block genesis(this->db->get(blockHash, DBPrefix::blocks), this->options->getChainID());
+    if (genesis != this->options->getGenesisBlock()) {
+      Logger::logToDebug(LogType::ERROR, Log::storage, __func__,
+        std::string("Genesis block mismatch: ") + Hex::fromBytes(genesis.hash().get()).get()
+        + std::string(" != ") + Hex::fromBytes(this->options->getGenesisBlock().hash().get()).get()
+      );
+      throw std::runtime_error("Genesis block mismatch storage block: " + Hex::fromBytes(genesis.serializeBlock()).get()
+        + " != options block " + Hex::fromBytes(this->options->getGenesisBlock().serializeBlock()).get()
+      );
+    }
   }
 }
 

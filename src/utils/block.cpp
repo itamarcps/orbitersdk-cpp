@@ -4,7 +4,7 @@
 Block::Block(const BytesArrView bytes, const uint64_t& requiredChainId) {
   try {
     // Split the bytes string
-    if (bytes.size() < 217) throw std::runtime_error("Invalid block size - too short");
+    if (bytes.size() < 217) throw std::runtime_error("Invalid block size - too short. want: 217 got: " + std::to_string(bytes.size()));
     this->validatorSig = Signature(bytes.subspan(0, 65));
     this->prevBlockHash = Hash(bytes.subspan(65, 32));
     this->blockRandomness = Hash(bytes.subspan(97, 32));

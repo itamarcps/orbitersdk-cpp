@@ -18,6 +18,14 @@ void initialize(std::unique_ptr<DB> &db, std::unique_ptr<Storage>& storage, std:
   db = std::make_unique<DB>("blocksTests/db");
   std::vector<std::pair<boost::asio::ip::address, uint64_t>> discoveryNodes;
   std::vector<Address> validators;
+  Block genesis(Hash(Utils::uint256ToBytes(0)), 0, 0);
+  PrivKey genesisSigner(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867"));
+  genesis.finalize(PrivKey(genesisSigner), 1656356646000000);
+
+  std::vector<std::pair<Address, uint256_t>> genesisBalances {
+    std::make_pair(Address(Hex::toBytes("0x00dead00665771855a34155f5e7405489df2c3c6")), uint256_t("1000000000000000000000"))
+  };
+
   options = std::make_unique<Options>(
     "blocksTests",
     "OrbiterSDK/cpp/linux_x86-64/0.1.2",
@@ -26,7 +34,10 @@ void initialize(std::unique_ptr<DB> &db, std::unique_ptr<Storage>& storage, std:
     8080,
     9999,
     discoveryNodes,
-    validators
+    validators,
+    genesis,
+    genesisSigner,
+    genesisBalances
   );
   storage = std::make_unique<Storage>(db, options);
 }

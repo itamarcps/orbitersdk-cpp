@@ -3,6 +3,7 @@
 
 #include "utils.h"
 #include "ecdsa.h"
+#include "block.h"
 
 #include <filesystem>
 #include <boost/asio/ip/address.hpp>
@@ -49,6 +50,12 @@ class Options {
     /// List of the initial validators of the chain.
     const std::vector<Address> genesisValidators;
 
+    /// Genesis block
+    const Block genesisBlock;
+
+    /// List of addresses and their respective initial balances.
+    const std::vector<std::pair<Address, uint256_t>> genesisBalances;
+
   public:
     /**
      * Constructor for a normal node.
@@ -62,13 +69,19 @@ class Options {
      * @param httpPort HTTP server port.
      * @param discoveryNodes List of known Discovery nodes.
      * @param genesisValidators List of the initial validators of the chain.
+     * @param genesisBlock Genesis block.
+     * @param genesisBalances List of addresses and their respective initial balances.
+     * @param genesisSigner PrivKey of the signer of the genesis block.
      */
     Options(
       const std::string& rootPath, const std::string& web3clientVersion,
       const uint64_t& version, const uint64_t& chainID,
       const uint16_t& wsPort, const uint16_t& httpPort,
       const std::vector<std::pair<boost::asio::ip::address, uint64_t>>& discoveryNodes,
-      const std::vector<Address>& genesisValidators
+      const std::vector<Address>& genesisValidators,
+      const Block& genesisBlock,
+      const std::vector<std::pair<Address, uint256_t>>& genesisBalances,
+      const PrivKey& genesisSigner
     );
 
     /**
@@ -82,6 +95,9 @@ class Options {
      * @param wsPort Websocket server port.
      * @param httpPort HTTP server port.
      * @param discoveryNodes List of known Discovery nodes.
+     * @param genesisBlock Genesis block.
+     * @param genesisBalances List of addresses and their respective initial balances.
+     * @param genesisSigner PrivKey of the signer of the genesis block.
      * @param privKey Private key of the Validator.
      */
     Options(
@@ -90,6 +106,9 @@ class Options {
       const uint16_t& wsPort, const uint16_t& httpPort,
       const std::vector<std::pair<boost::asio::ip::address, uint64_t>>& discoveryNodes,
       const std::vector<Address>& genesisValidators,
+      const Block& genesisBlock,
+      const std::vector<std::pair<Address, uint256_t>>& genesisBalances,
+      const PrivKey& genesisSigner,
       const PrivKey& privKey
     );
     
@@ -107,7 +126,9 @@ class Options {
       coinbase(other.coinbase),
       isValidator(other.isValidator),
       discoveryNodes(other.discoveryNodes),
-      genesisValidators(other.genesisValidators)
+      genesisValidators(other.genesisValidators),
+      genesisBlock(other.genesisBlock),
+      genesisBalances(other.genesisBalances)
     {}
 
     /// Getter for `rootPath`.
@@ -161,6 +182,12 @@ class Options {
 
     /// Getter for `genesisValidators`.
     const std::vector<Address>& getGenesisValidators() const { return this->genesisValidators; }
+
+    /// Getter for `genesisBlock`.
+    const Block& getGenesisBlock() const { return this->genesisBlock; }
+
+    /// Getter for `genesisBalances`.
+    const std::vector<std::pair<Address, uint256_t>>& getGenesisBalances() const { return this->genesisBalances; }
 
     /**
      * Load an options.json file from a given path and construct the singleton object.

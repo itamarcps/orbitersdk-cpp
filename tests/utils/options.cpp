@@ -13,6 +13,16 @@ namespace TOptions {
         Address(Hex::toBytes("0xbec7b74f70c151707a0bfb20fe3767c6e65499e0")),
         Address(Hex::toBytes("0xcabf34a268847a610287709d841e5cd590cc5c00"))
       };
+
+      Block genesis(Hash(Utils::uint256ToBytes(0)), 0, 0);
+      PrivKey genesisSigner(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867"));
+      genesis.finalize(PrivKey(genesisSigner), 1656356646000000);
+
+      std::vector<std::pair<Address, uint256_t>> genesisBalances {
+        std::make_pair(Address(Hex::toBytes("0x00dead00665771855a34155f5e7405489df2c3c6")), uint256_t("1000000000000000000000"))
+      };
+
+
       Options optionsWithPrivKey(
         "optionClassFromFileWithPrivKey",
         "OrbiterSDK/cpp/linux_x86-64/0.1.2",
@@ -22,6 +32,9 @@ namespace TOptions {
         8081,
         {},
         genesisValidatorList,
+        genesis,
+        genesisSigner,
+        genesisBalances,
         PrivKey(Hex::toBytes("0xb254f12b4ca3f0120f305cabf1188fe74f0bd38e58c932a3df79c4c55df8fa66"))
       );
 
@@ -37,6 +50,8 @@ namespace TOptions {
       REQUIRE(optionsFromFileWithPrivKey.getCoinbase() == optionsWithPrivKey.getCoinbase());
       REQUIRE(optionsFromFileWithPrivKey.getValidatorPrivKey() == optionsWithPrivKey.getValidatorPrivKey());
       REQUIRE(optionsFromFileWithPrivKey.getGenesisValidators() == optionsWithPrivKey.getGenesisValidators());
+      REQUIRE(optionsFromFileWithPrivKey.getGenesisBlock() == optionsWithPrivKey.getGenesisBlock());
+      REQUIRE(optionsFromFileWithPrivKey.getGenesisBalances() == optionsWithPrivKey.getGenesisBalances());
     }
   }
 }

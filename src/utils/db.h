@@ -176,7 +176,7 @@ class DB {
       rocksdb::Iterator *it = this->db->NewIterator(rocksdb::ReadOptions());
       Bytes keyTmp = pfx;
       keyTmp.reserve(pfx.size() + key.size());
-      keyTmp.insert(keyTmp.end(), key.begin(), key.end());
+      keyTmp.insert(keyTmp.end(), key.cbegin(), key.cend());
       rocksdb::Slice keySlice(reinterpret_cast<const char*>(keyTmp.data()), keyTmp.size());
       for (it->Seek(keySlice); it->Valid(); it->Next()) {
         if (it->key() == keySlice) { delete it; return true; }
@@ -196,7 +196,7 @@ class DB {
       rocksdb::Iterator *it = this->db->NewIterator(rocksdb::ReadOptions());
       Bytes keyTmp = pfx;
       keyTmp.reserve(pfx.size() + key.size());
-      keyTmp.insert(keyTmp.end(), key.begin(), key.end());
+      keyTmp.insert(keyTmp.end(), key.cbegin(), key.cend());
       rocksdb::Slice keySlice(reinterpret_cast<const char*>(keyTmp.data()), keyTmp.size());
       for (it->Seek(keySlice); it->Valid(); it->Next()) {
         if (it->key().ToString() == keySlice) {
@@ -221,7 +221,7 @@ class DB {
     bool put(const BytesContainerTypeOne& key, const BytesContainerTypeSecond& value, const Bytes& pfx = {}) const {
       Bytes keyTmp = pfx;
       keyTmp.reserve(pfx.size() + key.size());
-      keyTmp.insert(keyTmp.end(), key.begin(), key.end());
+      keyTmp.insert(keyTmp.end(), key.cbegin(), key.cend());
       rocksdb::Slice keySlice(reinterpret_cast<const char*>(keyTmp.data()), keyTmp.size());
       rocksdb::Slice valueSlice(reinterpret_cast<const char*>(value.data()), value.size());
       auto status = this->db->Put(rocksdb::WriteOptions(), keySlice, valueSlice);
@@ -242,7 +242,7 @@ class DB {
     bool del(const BytesContainer& key, const Bytes& pfx = {}) const {
       auto keyTmp = pfx;
       keyTmp.reserve(pfx.size() + key.size());
-      keyTmp.insert(keyTmp.end(), key.begin(), key.end());
+      keyTmp.insert(keyTmp.end(), key.cbegin(), key.cend());
       rocksdb::Slice keySlice(reinterpret_cast<const char*>(keyTmp.data()), keyTmp.size());
       auto status = this->db->Delete(rocksdb::WriteOptions(), keySlice);
       if (!status.ok()) {

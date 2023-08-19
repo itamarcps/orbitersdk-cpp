@@ -114,34 +114,21 @@ void initialize(std::unique_ptr<DB>& db,
     }
   }
   db = std::make_unique<DB>(dbName);
-  if (clearDb) {
-    Block genesis(Hash(Utils::uint256ToBytes(0)), 1678887537000000, 0);
-
-    // Genesis Keys:
-    // Private: 0xe89ef6409c467285bcae9f80ab1cfeb348  Hash(Hex::toBytes("0x0a0415d68a5ec2df57aab65efc2a7231b59b029bae7ff1bd2e40df9af96418c8")),7cfe61ab28fb7d36443e1daa0c2867
-    // Address: 0x00dead00665771855a34155f5e7405489df2c3c6
-    genesis.finalize(PrivKey(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867")),1678887538000000);
-    db->put(Utils::stringToBytes("latest"), genesis.serializeBlock(), DBPrefix::blocks);
-    db->put(Utils::uint64ToBytes(genesis.getNHeight()), genesis.hash().get(), DBPrefix::blockHeightMaps);
-    db->put(genesis.hash().get(), genesis.serializeBlock(), DBPrefix::blocks);
-
-    // Populate rdPoS DB with unique rdPoS, not default.
-    for (uint64_t i = 0; i < validatorPrivKeys.size(); ++i) {
-      db->put(Utils::uint64ToBytes(i), Address(Secp256k1::toAddress(Secp256k1::toUPub(validatorPrivKeys[i]))).get(),
-              DBPrefix::rdPoS);
-    }
-    // Populate State DB with one address.
-    /// Initialize with 0x00dead00665771855a34155f5e7405489df2c3c6 with nonce 0.
-    Address dev1(Hex::toBytes("0x00dead00665771855a34155f5e7405489df2c3c6"));
-    /// See ~State for encoding
-    uint256_t desiredBalance("1000000000000000000000");
-    Bytes value = Utils::uintToBytes(Utils::bytesRequired(desiredBalance));
-    Utils::appendBytes(value, Utils::uintToBytes(desiredBalance));
-    value.insert(value.end(), 0x00);
-    db->put(dev1.get(), value, DBPrefix::nativeAccounts);
-  }
   std::vector<std::pair<boost::asio::ip::address, uint64_t>> discoveryNodes;
-  std::vector<Address> validatorAddresses;
+  std::vector<Address> genesisValidatorList {
+    Address(Hex::toBytes("0x7588b0f553d1910266089c58822e1120db47e572")),
+    Address(Hex::toBytes("0x5fb516dc2cfc1288e689ed377a9eebe2216cf1e3")),
+    Address(Hex::toBytes("0x795083c42583842774febc21abb6df09e784fce5")),
+    Address(Hex::toBytes("0xbec7b74f70c151707a0bfb20fe3767c6e65499e0")),
+    Address(Hex::toBytes("0xcabf34a268847a610287709d841e5cd590cc5c00"))
+  };
+  Block genesis(Hash(Utils::uint256ToBytes(0)), 0, 0);
+  PrivKey genesisSigner(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867"));
+  genesis.finalize(PrivKey(genesisSigner), 1656356646000000);
+
+  std::vector<std::pair<Address, uint256_t>> genesisBalances {
+    std::make_pair(Address(Hex::toBytes("0x00dead00665771855a34155f5e7405489df2c3c6")), uint256_t("1000000000000000000000"))
+  };
   options = std::make_unique<Options>(
     folderPath,
     "OrbiterSDK/cpp/linux_x86-64/0.1.2",
@@ -150,7 +137,10 @@ void initialize(std::unique_ptr<DB>& db,
     serverPort,
     httpServerPort,
     discoveryNodes,
-    validatorAddresses
+    genesisValidatorList,
+    genesis,
+    genesisSigner,
+    genesisBalances
   );
   storage = std::make_unique<Storage>(db, options);
   p2p = std::make_unique<P2P::ManagerNormal>(boost::asio::ip::address::from_string("127.0.0.1"), rdpos, options, storage, state);
