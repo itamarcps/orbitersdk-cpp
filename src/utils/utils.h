@@ -241,6 +241,98 @@ using BaseTypes = std::variant<uint256_t, std::vector<uint256_t>, int256_t, std:
         bool, std::vector<bool>, Bytes, BytesEncoded, std::vector<Bytes>, std::string, std::vector<std::string>>;
 
 /**
+* Tuple wrapper that only allows the types in BaseTypes.
+* @tparam Types The types to allow.
+*/
+template<typename... Types>
+class Tuple {
+public:
+
+    /**
+    * Template for identifying if a type is one of a list of types.
+    * @tparam T The type to check.
+    * @tparam Ts The types to check against.
+    */
+    template<typename T, typename... Ts>
+    struct isOneOf : std::disjunction<std::is_same<T, Ts>...> {};
+
+    /**
+    * Template for identifying if a type is one of a variant.
+    * @tparam T The type to check.
+    * @tparam Var The variant to check against.
+    */
+    template<typename T, typename Var>
+    struct isInVariant;
+
+    /**
+    * Template explicit specialization for identifying if a type is one of a variant.
+    * @tparam T The type to check.
+    * @tparam VarTypes The types to check against.
+    */
+    template<typename T, typename... VarTypes>
+    struct isInVariant<T, std::variant<VarTypes...>> : isOneOf<T, VarTypes...> {};
+
+    /**
+    * Template for identifying if a type is one of a variant.
+    * @tparam T The type to check.
+    * @tparam Var The variant to check against.
+    */
+    template<typename T, typename Var>
+    inline static constexpr bool isInVariantV = isInVariant<T, Var>::value;
+
+    /**
+    * Template for checking if a type is one of a list of types.
+    * @tparam Var The variant to check against.
+    * @tparam T The type to check.
+    */
+    template<typename Var, typename T>
+    static void checkType() {
+        static_assert(isInVariantV<T, Var>, "Type not allowed in Tuple");
+    }
+
+    /**
+    * Base case for checking if a type is one of a list of types.
+    * @tparam Var The variant to check against.
+    */
+    template<typename Var>
+    static void checkTupleType() {}
+
+    /**
+    * Recursive case for checking if a type is one of a list of types.
+    * @tparam Var The variant to check against.
+    * @tparam T The type to check.
+    * @tparam Rest The rest of the types to check.
+    */
+    template<typename Var, typename T, typename... Rest>
+    static void checkTupleType() {
+        checkType<Var, T>();
+        checkTupleType<Var, Rest...>();
+    }
+
+    /**
+    * Default constructor.
+    */
+    Tuple () {
+        checkTupleType<BaseTypes, Types...>();
+    }
+
+    /**
+    * Constructor.
+    * @param values The values to initialize the tuple with.
+    */
+    Tuple(Types... values) : data(values...) {
+        checkTupleType<BaseTypes, Types...>();
+    }
+
+    void print() const {
+        std::apply([](const auto&... items) {((std::cout << items << " "), ...);}, data);
+        std::cout << std::endl;
+    }
+
+    std::tuple<Types...> data; ///< The tuple data.
+};
+
+/**
  * ethCallInfo: tuple of (from, to, gasLimit, gasPrice, value, functor, data).
  * **ATTENTION**: Be aware that we are using BytesArrView, so you MUST
  * be sure that the data allocated in the BytesArrView is valid during
