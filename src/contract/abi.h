@@ -94,7 +94,8 @@ enum Types {
     address, addressArr,
     boolean, booleanArr,
     bytes, bytesArr,
-    string, stringArr
+    string, stringArr,
+    tuple
 };
 
 
@@ -154,6 +155,14 @@ struct ABIType<std::string> {
 template <>
 struct ABIType<Bytes> {
   static constexpr Types value = Types::bytes; ///< ABI type is bytes.
+};
+
+/**
+* Specialization for Tuple.
+*/
+template < typename... TupleTypes>
+struct ABIType<Tuple<TupleTypes...>> {
+  static constexpr Types value = Types::tuple; ///< ABI type is tuple.
 };
 
 /**
@@ -924,7 +933,8 @@ std::string inline getStringFromABIEnum(Types type) {
     {Types::bytes, "bytes"},
     {Types::bytesArr, "bytes[]"},
     {Types::string, "string"},
-    {Types::stringArr, "string[]"}
+    {Types::stringArr, "string[]"},
+    {Types::tuple, "tuple"}
   };
 
   auto it = typeMappings.find(type);
@@ -1077,7 +1087,8 @@ Types inline getABIEnumFromString(const std::string& type) {
     {"bytes", Types::bytes},
     {"bytes[]", Types::bytesArr},
     {"string", Types::string},
-    {"string[]", Types::stringArr}
+    {"string[]", Types::stringArr},
+    {"tuple", Types::tuple}
   };
 
   auto it = typeMappings.find(type);
@@ -1533,6 +1544,7 @@ Types inline getABIEnumFromString(const std::string& type) {
         case Types::bytesArr: return this->getData<std::vector<Bytes>>(index);
         case Types::string: return this->getData<std::string>(index);
         case Types::stringArr: return this->getData<std::vector<std::string>>(index);
+        case Types::tuple: return this->getData<Tuple<>>(index);
         default: throw std::runtime_error("Invalid ABI::Types type: " + getStringFromABIEnum(type));
       }
     }
