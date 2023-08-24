@@ -237,7 +237,7 @@ using BytesArrMutableView = std::span<Byte, std::dynamic_extent>; ///< Typedef f
 * Based on Solidity types.
 * @note: Fixed point types are not supported yet, because they are not supported fully in Solidity.
 */
-using BaseTypes = std::variant<uint256_t, std::vector<uint256_t>, int256_t, std::vector<int256_t>, Address, std::vector<Address>,
+using TupleBaseTypes = std::variant<uint256_t, std::vector<uint256_t>, int256_t, std::vector<int256_t>, Address, std::vector<Address>,
         bool, std::vector<bool>, Bytes, BytesEncoded, std::vector<Bytes>, std::string, std::vector<std::string>>;
 
 /**
@@ -313,15 +313,17 @@ public:
     * Default constructor.
     */
     Tuple () {
-        checkTupleType<BaseTypes, Types...>();
+        checkTupleType<TupleBaseTypes, Types...>();
     }
 
     /**
     * Constructor.
     * @param values The values to initialize the tuple with.
     */
-    Tuple(Types... values) : data(values...) {
-        checkTupleType<BaseTypes, Types...>();
+    template<typename... Args, 
+             std::enable_if_t<sizeof...(Args) != 0, int> = 0>
+    Tuple(Args... values) : data(values...) {
+        checkTupleType<TupleBaseTypes, Types...>();
     }
 
     void print() const {
@@ -331,6 +333,9 @@ public:
 
     std::tuple<Types...> data; ///< The tuple data.
 };
+
+using BaseTypes = std::variant<uint256_t, std::vector<uint256_t>, int256_t, std::vector<int256_t>, Address, std::vector<Address>,
+        bool, std::vector<bool>, Bytes, BytesEncoded, std::vector<Bytes>, std::string, std::vector<std::string>, Tuple<>>;
 
 /**
  * ethCallInfo: tuple of (from, to, gasLimit, gasPrice, value, functor, data).

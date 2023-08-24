@@ -31,8 +31,8 @@ void initialize(std::unique_ptr<Options>& options,
   if (deleteDB) {
     /// Create the contract.
     ABI::Encoder::EncVar createNewERC20ContractVars;
-    createNewERC20ContractVars.push_back("TestToken");
-    createNewERC20ContractVars.push_back("TST");
+    createNewERC20ContractVars.push_back(std::string("Test Token"));
+    createNewERC20ContractVars.push_back(std::string("TST"));
     createNewERC20ContractVars.push_back(static_cast<uint256_t>(18));
     createNewERC20ContractVars.push_back(static_cast<uint256_t>(1000000000000000000));
     ABI::Encoder createNewERC20ContractEncoder(createNewERC20ContractVars);

@@ -158,7 +158,7 @@ TEST_CASE("ABI Namespace", "[contract][abi]") {
 
   SECTION("Encode String (Single)") {
     ABI::Encoder::EncVar eV;
-    eV.push_back("Hello World!");
+    eV.push_back(std::string("Hello World!"));
 
       ABI::Encoder e(eV, "testString(string)");
       auto eS = Utils::create_view_span(e.getData());
@@ -427,7 +427,7 @@ TEST_CASE("ABI Namespace", "[contract][abi]") {
         Hex::toBytes("0x6777b56cd127407ae1b1cc309905521e"),
         Hex::toBytes("0x52719fe16375c2446b109dfcf9336c38"),
         Hex::toBytes("0x6763b32cbd1c695a694d66fe2e729c97")});
-    eV.push_back("This is a string");
+    eV.push_back(std::string("This is a string"));
     eV.push_back(std::vector<std::string>{"Yes", "This", "Is", "A", "String",
                                           "Array", "How stupid lol"});
 
