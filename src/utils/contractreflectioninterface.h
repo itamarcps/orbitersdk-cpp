@@ -60,7 +60,7 @@ void inline populateMethodArgumentsTypesMap() {
   const meta::class_type contractType = meta::resolve_type<TContract>();
   std::string methodName;
   for (const meta::method &methods : contractType.get_methods()) {
-    methodName = methods.get_name();
+    methodName = Utils::getRealTypeName<TContract>() + "::" + methods.get_name();
     auto arity = methods.get_type().get_arity();
     if (arity > 0) {
       std::vector<meta::argument> args = methods.get_arguments();
@@ -100,7 +100,8 @@ std::vector<std::string> inline getMethodArgumentsTypesString(
   if (!isContractRegistered<TContract>()) {
     throw std::runtime_error("Contract " + Utils::getRealTypeName<TContract>() + " not registered");
   }
-  auto it = methodArgumentsTypesMap.find(methodName);
+  const std::string qualifiedMethodName = Utils::getRealTypeName<TContract>() + "::" + methodName;
+  auto it = methodArgumentsTypesMap.find(qualifiedMethodName);
   if (it != methodArgumentsTypesMap.end()) {
     return it->second;
   }
@@ -118,7 +119,8 @@ std::vector<ABI::Types> inline getMethodArgumentsTypesABI(
   if (!isContractRegistered<TContract>()) {
     throw std::runtime_error("Contract " + Utils::getRealTypeName<TContract>() + " not registered");
   }
-  auto it = methodArgumentsTypesMap.find(methodName);
+  const std::string qualifiedMethodName = Utils::getRealTypeName<TContract>() + "::" + methodName;
+  auto it = methodArgumentsTypesMap.find(qualifiedMethodName);
   if (it != methodArgumentsTypesMap.end()) {
     std::vector<ABI::Types> types;
     for (auto const &x : it->second) {
@@ -163,6 +165,12 @@ void inline registerContract(const std::vector<std::string> &ctorArgs,
                     uint144_t, uint152_t, uint160_t, uint168_t, uint176_t,
                     uint184_t, uint192_t, uint200_t, uint208_t, uint216_t,
                     uint224_t, uint232_t, uint240_t, uint248_t, uint256_t,
+                    int8_t, int16_t, int24_t, int32_t, int40_t, int48_t, int56_t,
+                    int64_t, int72_t, int80_t, int88_t, int96_t, int104_t,
+                    int112_t, int120_t, int128_t, int136_t, int144_t, int152_t,
+                    int160_t, int168_t, int176_t, int184_t, int192_t, int200_t,
+                    int208_t, int216_t, int224_t, int232_t, int240_t, int248_t,
+                    int256_t,
                     Address, bool, std::string, Bytes>(typeMap);
     }
     populateMethodArgumentsTypesMap<TContract>();
