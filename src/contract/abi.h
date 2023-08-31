@@ -1,3 +1,10 @@
+/*
+Copyright (c) [2023] [Sparq Network]
+
+This software is distributed under the MIT License.
+See the LICENSE.txt file in the project root for more information.
+*/
+
 #ifndef ABI_H
 #define ABI_H
 
@@ -5,12 +12,12 @@
 #include <any>
 
 #include "../utils/hex.h"
-#include "../utils/json.hpp"
+#include "../libs/json.hpp"
 #include "../utils/utils.h"
 
 /// Namespace for Solidity ABI-related operations.
 namespace ABI {
-  /**
+/**
  * Enum for the types of Solidity variables.
  * Equivalency is as follows:
  * - uintn = uintn (Solidity) = uintn_t (C++), where n <= 256 and n % 8 == 0
@@ -118,7 +125,7 @@ struct ABIType {
 
 
 /**
-* Specialization for address.
+* Specialization for Address.
 */
 template <>
 struct ABIType<Address> {
@@ -299,7 +306,7 @@ struct ABIType<uint128_t> {
 template <>
 struct ABIType<uint136_t> {
   static constexpr Types value = Types::uint136; ///< ABI type is uint136.
-};  
+};
 
 /**
 * Specialization for uint144_t.
@@ -1114,7 +1121,22 @@ Types inline getABIEnumFromString(const std::string& type) {
   class Encoder {
     private:
       Bytes data_; ///< Encoded Solidity ABI string, as RAW BYTES. Use Hex::fromBytes().get() to print it properly.
-      Functor functor; ///< Functor of the function to call. (if any)
+      Functor functor_; ///< Functor of the function to call. (if any)
+
+      /**
+      * Checks if a given type is a valid ABI type.
+      * @param funcType The type to check.
+      * @return True if the type is valid, false otherwise.
+      */
+      bool isValidType(const std::string_view& funcType);
+
+      /**
+      * Checks if a given type is a valid and supported ABI type.
+      * @param funcType The type to check.
+      * @param dataValue The value to check.
+      * @return True if the type is valid and supported, false otherwise.
+      */
+      bool matchesDataType(const std::string_view& funcType, const BaseTypes& dataValue);
 
       /**
        * Encode a function header into Solidity ABI format.
@@ -1221,7 +1243,7 @@ Types inline getABIEnumFromString(const std::string& type) {
       const Bytes& getData() const { return this->data_; }
 
       /// Getter for 'functor'
-      const Functor& getFunctor() const { return this->functor; }
+      const Functor& getFunctor() const { return this->functor_; }
 
       /**
        * Get the length of `data`.
@@ -1549,11 +1571,11 @@ Types inline getABIEnumFromString(const std::string& type) {
       }
     }
 
-      /**
-       * Get the size of the `data` list.
-       * @return The total number of decoded types.
-       */
-      size_t getDataSize() const { return this->data_.size(); }
+    /**
+     * Get the size of the `data` list.
+     * @return The total number of decoded types.
+     */
+    size_t getDataSize() const { return this->data_.size(); }
   };
 }; // namespace ABI
 

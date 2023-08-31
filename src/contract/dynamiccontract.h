@@ -1,3 +1,10 @@
+/*
+Copyright (c) [2023] [Sparq Network]
+
+This software is distributed under the MIT License.
+See the LICENSE.txt file in the project root for more information.
+*/
+
 #ifndef DYNAMICCONTRACT_H
 #define DYNAMICCONTRACT_H
 
@@ -13,32 +20,32 @@
  */
 class DynamicContract : public BaseContract {
   private:
-    /**
+   /**
     * Map of non-payable functions that can be called by the contract.
     * The key is the function signature (first 4 hex bytes of keccak).
     * The value is a function that takes a vector of bytes (the arguments) and returns a ReturnType.
     */
     std::unordered_map<
-    Functor, std::function<BaseTypes(const ethCallInfo& callInfo)>, SafeHash
-  > publicFunctions;
+      Functor, std::function<BaseTypes(const ethCallInfo& callInfo)>, SafeHash
+    > publicFunctions_;
 
-  /**
-  * Map of payable functions that can be called by the contract.
-  * The key is the function signature (first 4 hex bytes of keccak).
-  * The value is a function that takes a vector of bytes (the arguments) and returns a ReturnType.
-  */
-  std::unordered_map<
-    Functor, std::function<BaseTypes(const ethCallInfo& callInfo)>, SafeHash
-  > payableFunctions;
+   /**
+    * Map of payable functions that can be called by the contract.
+    * The key is the function signature (first 4 hex bytes of keccak).
+    * The value is a function that takes a vector of bytes (the arguments) and returns a ReturnType.
+    */
+    std::unordered_map<
+      Functor, std::function<BaseTypes(const ethCallInfo& callInfo)>, SafeHash
+    > payableFunctions_;
 
-    /**
+   /**
     * Map of view functions that can be called by the contract.
     * The key is the function signature (first 4 hex bytes of keccak).
     * The value is a function that takes a vector of bytes (the arguments) and returns a ReturnType.
     */
     std::unordered_map<
       Functor, std::function<BaseTypes(const ethCallInfo& callInfo)>, SafeHash
-    > viewFunctions;
+    > viewFunctions_;
 
     /**
      * Register a callable function (a function that is called by a transaction),
@@ -46,20 +53,21 @@ class DynamicContract : public BaseContract {
      * @param functor Solidity function signature (first 4 hex bytes of keccak).
      * @param f Function to be called.
      */
-    void registerFunction(const Functor& functor,
-                         std::function<BaseTypes(const ethCallInfo& tx)> f) {
-      publicFunctions[functor] = f;
+    void registerFunction(
+      const Functor& functor, std::function<BaseTypes(const ethCallInfo& tx)> f
+    ) {
+      publicFunctions_[functor] = f;
     }
 
     /**
      * Register a variable that was used by the contract.
      * @param variable Reference to the variable.
      */
-    inline void registerVariableUse(SafeBase& variable) { interface.registerVariableUse(variable); }
+    inline void registerVariableUse(SafeBase& variable) { interface_.registerVariableUse(variable); }
 
   protected:
     /// Reference to the contract manager interface.
-    ContractManagerInterface& interface;
+    ContractManagerInterface& interface_;
 
     /**
      * Helper function for registering a payable/non-payable function.
@@ -69,15 +77,15 @@ class DynamicContract : public BaseContract {
      */
     template <typename R, typename T>
     struct RegisterHelper {
-        template <typename MemFunc>
+      template <typename MemFunc>
         /**
-        * Create a ReturnType object by calling the member function.
-        * @param instance Pointer to the instance of the class.
-        * @param memFunc Pointer to the member function.
-        * @return A ReturnType object.
-        */
+         * Create a ReturnType object by calling the member function.
+         * @param instance Pointer to the instance of the class.
+         * @param memFunc Pointer to the member function.
+         * @return A ReturnType object.
+         */
         static BaseTypes createReturnType(T* instance, MemFunc memFunc) {
-            return BaseTypes((instance->*memFunc)());
+          return BaseTypes((instance->*memFunc)());
         }
     };
 
@@ -88,18 +96,18 @@ class DynamicContract : public BaseContract {
     */
     template <typename T>
     struct RegisterHelper<void, T> {
-        template <typename MemFunc>
-        /**
-        * Create a ReturnType object by calling the member function.
-        * @param instance Pointer to the instance of the class.
-        * @param memFunc Pointer to the member function.
-        * @return A ReturnType object (default constructed).
-        * TODO: Decide if this is the best way to handle void functions.
-        */
-        static BaseTypes createReturnType(T* instance, MemFunc memFunc) {
-            (instance->*memFunc)();
-            return BaseTypes{};
-        }
+      template <typename MemFunc>
+      /**
+      * Create a ReturnType object by calling the member function.
+      * @param instance Pointer to the instance of the class.
+      * @param memFunc Pointer to the member function.
+      * @return A ReturnType object (default constructed).
+      * TODO: Decide if this is the best way to handle void functions.
+      */
+      static BaseTypes createReturnType(T* instance, MemFunc memFunc) {
+          (instance->*memFunc)();
+          return BaseTypes{};
+      }
     };
 
     /**
@@ -301,19 +309,19 @@ class DynamicContract : public BaseContract {
         ABI::Decoder decoder(types, std::get<6>(callInfo));
         std::vector<std::any> dataVector;
 
-      for (size_t i = 0; i < types.size(); i++) {
-        if (ABI::castUintFunctions.count(types[i]) > 0) {
-          uint256_t value = std::any_cast<uint256_t>(decoder.getDataDispatch(i, types[i]));
-          dataVector.push_back(ABI::castUintFunctions[types[i]](value));
+        for (size_t i = 0; i < types.size(); i++) {
+          if (ABI::castUintFunctions.count(types[i]) > 0) {
+            uint256_t value = std::any_cast<uint256_t>(decoder.getDataDispatch(i, types[i]));
+            dataVector.push_back(ABI::castUintFunctions[types[i]](value));
+          }
+          else if (ABI::castIntFunctions.count(types[i]) > 0) {
+            int256_t value = std::any_cast<int256_t>(decoder.getDataDispatch(i, types[i]));
+            dataVector.push_back(ABI::castIntFunctions[types[i]](value));
+          }
+           else {
+            dataVector.push_back(decoder.getDataDispatch(i, types[i]));
+          }
         }
-        else if (ABI::castIntFunctions.count(types[i]) > 0) {
-          int256_t value = std::any_cast<int256_t>(decoder.getDataDispatch(i, types[i]));
-          dataVector.push_back(ABI::castIntFunctions[types[i]](value));
-        }
-         else {
-          dataVector.push_back(decoder.getDataDispatch(i, types[i]));
-        }
-      }
         auto result = tryCallFuncWithTuple(instance, memFunc, dataVector, std::index_sequence_for<Args...>());
         return BaseTypes(result);
       };
@@ -390,7 +398,7 @@ class DynamicContract : public BaseContract {
     void registerPayableFunction(
     const Functor& functor,
           std::function<BaseTypes(const ethCallInfo& tx)> f) {
-    payableFunctions[functor] = f;
+    payableFunctions_[functor] = f;
   }
 
     /**
@@ -401,7 +409,7 @@ class DynamicContract : public BaseContract {
     void registerViewFunction(
       const Functor& functor, std::function<BaseTypes(const ethCallInfo& str)> f
     ) {
-      viewFunctions[functor] = f;
+      viewFunctions_[functor] = f;
     }
 
     /**
@@ -430,7 +438,7 @@ class DynamicContract : public BaseContract {
       const std::string& contractName, const Address& address,
       const Address& creator, const uint64_t& chainId,
       const std::unique_ptr<DB>& db
-    ) : BaseContract(contractName, address, creator, chainId, db), interface(interface) {}
+    ) : BaseContract(contractName, address, creator, chainId, db), interface_(interface) {}
 
     /**
      * Constructor for loading the contract from the database.
@@ -441,7 +449,7 @@ class DynamicContract : public BaseContract {
     DynamicContract(
       ContractManagerInterface& interface,
       const Address& address, const std::unique_ptr<DB>& db
-    ) : BaseContract(address, db), interface(interface) {}
+    ) : BaseContract(address, db), interface_(interface) {}
 
     /**
      * Invoke a contract function using a tuple of (from, to, gasLimit, gasPrice, value, data).
@@ -454,12 +462,12 @@ class DynamicContract : public BaseContract {
       try {
         Functor funcName = std::get<5>(callInfo);
         if (this->isPayableFunction(funcName)) {
-          auto func = this->payableFunctions.find(funcName);
-          if (func == this->payableFunctions.end()) throw std::runtime_error("Functor not found for payable function");
+          auto func = this->payableFunctions_.find(funcName);
+          if (func == this->payableFunctions_.end()) throw std::runtime_error("Functor not found for payable function");
           func->second(callInfo);
         } else {
-          auto func = this->publicFunctions.find(funcName);
-          if (func == this->publicFunctions.end()) throw std::runtime_error("Functor not found for non-payable function");
+          auto func = this->publicFunctions_.find(funcName);
+          if (func == this->publicFunctions_.end()) throw std::runtime_error("Functor not found for non-payable function");
           func->second(callInfo);
         }
       } catch (const std::exception& e) {
@@ -476,19 +484,15 @@ class DynamicContract : public BaseContract {
     const Bytes ethCallView(const ethCallInfo& data) const override {
       try {
         Functor funcName = std::get<5>(data);
-        auto func = this->viewFunctions.find(funcName);
-        if (func == this->viewFunctions.end()) throw std::runtime_error("Functor not found");
-
+        auto func = this->viewFunctions_.find(funcName);
+        if (func == this->viewFunctions_.end()) throw std::runtime_error("Functor not found");
         BaseTypes result = func->second(data);
-
         if (std::holds_alternative<BytesEncoded>(result)) {
           return std::get<BytesEncoded>(result).data;
-        }
-        else {
+        } else {
           ABI::Encoder::EncVar resultVec {result};
           return ABI::Encoder(resultVec).getData();
         }
-          
       } catch (std::exception& e) {
         throw std::runtime_error(e.what());
       }
@@ -500,7 +504,7 @@ class DynamicContract : public BaseContract {
      * @return `true` if the functor is registered as a payable function, `false` otherwise.
      */
     bool isPayableFunction(const Functor& functor) const {
-      return this->payableFunctions.find(functor) != this->payableFunctions.end();
+      return this->payableFunctions_.find(functor) != this->payableFunctions_.end();
     }
 
     /**
@@ -511,7 +515,7 @@ class DynamicContract : public BaseContract {
      * @return A pointer to the casted contract.
      */
     template <typename T> const T *getContract(const Address& address) const {
-      return interface.getContract<T>(address);
+      return interface_.getContract<T>(address);
     }
 
     /**
@@ -521,7 +525,7 @@ class DynamicContract : public BaseContract {
     * @return A pointer to the casted contract.
     */
     template <typename T> T* getContract(const Address& address) {
-      return interface.getContract<T>(address);
+      return interface_.getContract<T>(address);
     }
 
     /**
@@ -566,10 +570,10 @@ class DynamicContract : public BaseContract {
     */
     template <typename R, typename C, typename... Args>
     R callContractFunction(const Address& targetAddr, R(C::*func)(const Args&...), const Args&... args) {
-        return this->interface.callContractFunction(this->getContractAddress(),
+        return this->interface_.callContractFunction(this->getOrigin(),
+                                                    this->getContractAddress(),
                                                     targetAddr,
                                                     0,
-                                                    this->getCommit(),
                                                     func,
                                                     std::forward<const Args&>(args)...);
     }
@@ -587,11 +591,11 @@ class DynamicContract : public BaseContract {
     */
     template <typename R, typename C, typename... Args>
     R callContractFunction(const uint256_t& value, const Address& address, R(C::*func)(const Args&...), const Args&... args) {
-        return this->interface.callContractFunction(this->getContractAddress(),
-                                                    address, 
+        return this->interface_.callContractFunction(this->getOrigin(),
+                                                    this->getContractAddress(),
+                                                    address,
                                                     value,
-                                                    this->getCommit(),
-                                                    func, 
+                                                    func,
                                                     std::forward<const Args&>(args)...);
     }
 
@@ -605,10 +609,10 @@ class DynamicContract : public BaseContract {
     */
     template <typename R, typename C>
     R callContractFunction(const Address& targetAddr, R(C::*func)()) {
-        return this->interface.callContractFunction(this->getContractAddress(),
-                                                    targetAddr, 
+        return this->interface_.callContractFunction(this->getOrigin(),
+                                                    this->getContractAddress(),
+                                                    targetAddr,
                                                     0,
-                                                    this->getCommit(),
                                                     func);
     }
 
@@ -623,10 +627,10 @@ class DynamicContract : public BaseContract {
     */
     template <typename R, typename C>
     R callContractFunction(const uint256_t& value, const Address& address, R(C::*func)()) {
-        return this->interface.callContractFunction(this->getContractAddress(),
-                                                    address, 
+        return this->interface_.callContractFunction(this->getOrigin(),
+                                                    this->getContractAddress(),
+                                                    address,
                                                     value,
-                                                    this->getCommit(),
                                                     func);
     }
 
@@ -680,7 +684,7 @@ class DynamicContract : public BaseContract {
         Utils::safePrint("CallCreateContract being called...");
         ABI::Encoder::EncVar vars = {std::forward<Args>(args)...};
         ABI::Encoder encoder(vars);
-        return this->interface.callCreateContract<TContract>(this->getContractAddress(), gas, gasPrice, value, std::move(encoder));
+        return this->interface_.callCreateContract<TContract>(this->getOrigin(), this->getContractAddress(), gas, gasPrice, value, std::move(encoder));
     }
 
     /**
@@ -689,7 +693,7 @@ class DynamicContract : public BaseContract {
      * @return The balance of the contract.
      */
     uint256_t getBalance(const Address& address) const {
-      return interface.getBalanceFromAddress(address);
+      return interface_.getBalanceFromAddress(address);
     }
 
     /**
@@ -698,7 +702,7 @@ class DynamicContract : public BaseContract {
      * @param amount The amount of tokens to send.
      */
     void sendTokens(const Address& to, const uint256_t& amount) {
-      interface.sendTokens(this->getContractAddress(), to, amount);
+      interface_.sendTokens(this->getContractAddress(), to, amount);
     }
 
     /**
