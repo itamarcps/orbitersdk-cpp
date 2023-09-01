@@ -86,7 +86,7 @@ std::pair<uint256_t, uint256_t> DEXV2Router02::_addLiquidity(
     uint256_t amountBoptimal = DEXV2Library::quote(amountADesired, reserveA, reserveB);
     if (amountBoptimal <= amountBDesired) {
       if (amountBoptimal < amountBMin) throw std::runtime_error(
-        "DEXV2Router02::_addLiquidity: INSUFFICIENT_B_AMOUNT"
+        std::string("DEXV2Router02::_addLiquidity: INSUFFICIENT_B_AMOUNT... amountBOptimal: ") + boost::lexical_cast<std::string>(amountBoptimal) + std::string(" amountBMin: ") + boost::lexical_cast<std::string>(amountBMin) + " amountBDesired: " + boost::lexical_cast<std::string>(amountBDesired)
       );
       amountA = amountADesired;
       amountB = amountBoptimal;
@@ -94,12 +94,12 @@ std::pair<uint256_t, uint256_t> DEXV2Router02::_addLiquidity(
       uint256_t amountAoptimal = DEXV2Library::quote(amountBDesired, reserveB, reserveA);
       if (amountAoptimal <= amountADesired) {
         if (amountAoptimal < amountAMin) throw std::runtime_error(
-          "DEXV2Router02::_addLiquidity: INSUFFICIENT_A_AMOUNT"
+          "DEXV2Router02::_addLiquidity: INSUFFICIENT_A_AMOUNT... amountAoptimal: " + boost::lexical_cast<std::string>(amountAoptimal) + " amountAMin: " + boost::lexical_cast<std::string>(amountAMin) + " amountADesired: " + boost::lexical_cast<std::string>(amountADesired)
         );
         amountA = amountAoptimal;
         amountB = amountBDesired;
       } else {
-        throw std::runtime_error("DEXV2Router02::_addLiquidity: INSUFFICIENT_A_AMOUNT");
+        throw std::runtime_error("DEXV2Router02::_addLiquidity: INSUFFICIENT_A_AMOUNT... amountAoptimal: " + boost::lexical_cast<std::string>(amountAoptimal) + " amountAMin: " + boost::lexical_cast<std::string>(amountAMin) + " amountADesired: " + boost::lexical_cast<std::string>(amountADesired));
       }
     }
   }
