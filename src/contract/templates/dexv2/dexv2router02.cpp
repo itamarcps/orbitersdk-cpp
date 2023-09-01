@@ -77,7 +77,7 @@ std::pair<uint256_t, uint256_t> DEXV2Router02::_addLiquidity(
   } else {
     Utils::safePrint("_addLiquidity: contract exists!");
   }
-  auto reserves = this->callContractViewFunction(pairAddress.get(), &DEXV2Pair::getReservess);
+  auto reserves = DEXV2Library::getReserves(this->interface, this->factory_.get(), tokenA, tokenB);
   const auto& [reserveA, reserveB] = reserves;
   if (reserveA == 0 && reserveB == 0) {
     amountA = amountADesired;
