@@ -245,104 +245,65 @@ using BytesArrMutableView = std::span<Byte, std::dynamic_extent>; ///< Typedef f
 * @note: Fixed point types are not supported yet, because they are not supported fully in Solidity.
 */
 using TupleBaseTypes = std::variant<uint256_t, std::vector<uint256_t>, int256_t, std::vector<int256_t>, Address, std::vector<Address>,
-        bool, std::vector<bool>, Bytes, BytesEncoded, std::vector<Bytes>, std::string, std::vector<std::string>>;
+        bool, std::vector<bool>, Bytes, std::vector<Bytes>, std::string, std::vector<std::string>>;
 
-/**
-* Tuple wrapper that only allows the types in BaseTypes.
-* @tparam Types The types to allow.
-*/
-template<typename... Types>
+
 class Tuple {
 public:
-
-    /**
-    * Template for identifying if a type is one of a list of types.
-    * @tparam T The type to check.
-    * @tparam Ts The types to check against.
-    */
-    template<typename T, typename... Ts>
-    struct isOneOf : std::disjunction<std::is_same<T, Ts>...> {};
-
-    /**
-    * Template for identifying if a type is one of a variant.
-    * @tparam T The type to check.
-    * @tparam Var The variant to check against.
-    */
-    template<typename T, typename Var>
-    struct isInVariant;
-
-    /**
-    * Template explicit specialization for identifying if a type is one of a variant.
-    * @tparam T The type to check.
-    * @tparam VarTypes The types to check against.
-    */
-    template<typename T, typename... VarTypes>
-    struct isInVariant<T, std::variant<VarTypes...>> : isOneOf<T, VarTypes...> {};
-
-    /**
-    * Template for identifying if a type is one of a variant.
-    * @tparam T The type to check.
-    * @tparam Var The variant to check against.
-    */
-    template<typename T, typename Var>
-    inline static constexpr bool isInVariantV = isInVariant<T, Var>::value;
-
-    /**
-    * Template for checking if a type is one of a list of types.
-    * @tparam Var The variant to check against.
-    * @tparam T The type to check.
-    */
-    template<typename Var, typename T>
-    static void checkType() {
-        static_assert(isInVariantV<T, Var>, "Type not allowed in Tuple");
+    template <typename... Ts>
+    Tuple(const std::tuple<Ts...>& tuple) {
+        static_assert((... && isTupleBaseType<Ts>), "Invalid type in Tuple. Only uint256_t, int256_t, Address, bool, Bytes, std::string and their vector versions are allowed.");
+        typeOrder = {typeid(Ts)...};
+        std::apply([this](const auto&... items) { 
+            (setData(items), ...);
+        }, tuple);
     }
 
-    /**
-    * Base case for checking if a type is one of a list of types.
-    * @tparam Var The variant to check against.
-    */
-    template<typename Var>
-    static void checkTupleType() {}
-
-    /**
-    * Recursive case for checking if a type is one of a list of types.
-    * @tparam Var The variant to check against.
-    * @tparam T The type to check.
-    * @tparam Rest The rest of the types to check.
-    */
-    template<typename Var, typename T, typename... Rest>
-    static void checkTupleType() {
-        checkType<Var, T>();
-        checkTupleType<Var, Rest...>();
+    template <typename T>
+    void setData(const T& item) {
+        static_assert(isTupleBaseType<T>, "Invalid type");
+        data.emplace_back(item);
     }
 
-    /**
-    * Default constructor.
-    */
-    Tuple () {
-        checkTupleType<TupleBaseTypes, Types...>();
+    template <typename T>
+    T get(size_t index) const {
+        if (index >= data.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+
+        if (typeid(T) != typeOrder[index]) {
+            throw std::bad_cast();
+        }
+
+        const TupleBaseTypes &var = data[index];
+        if (const T *val = std::get_if<T>(&var)) {
+            return *val;
+        } else {
+            throw std::bad_cast();
+        }
     }
 
-    /**
-    * Constructor.
-    * @param values The values to initialize the tuple with.
-    */
-    template<typename... Args, 
-             std::enable_if_t<sizeof...(Args) != 0, int> = 0>
-    Tuple(Args... values) : data(values...) {
-        checkTupleType<TupleBaseTypes, Types...>();
-    }
+private:
+    template <typename T>
+    static constexpr bool isTupleBaseType = std::disjunction_v<std::is_same<T, uint256_t>, 
+                                                               std::is_same<T, std::vector<uint256_t>>, 
+                                                               std::is_same<T, int256_t>, 
+                                                               std::is_same<T, std::vector<int256_t>>, 
+                                                               std::is_same<T, Address>, 
+                                                               std::is_same<T, std::vector<Address>>, 
+                                                               std::is_same<T, bool>, 
+                                                               std::is_same<T, std::vector<bool>>, 
+                                                               std::is_same<T, Bytes>,  
+                                                               std::is_same<T, std::vector<Bytes>>, 
+                                                               std::is_same<T, std::string>, 
+                                                               std::is_same<T, std::vector<std::string>>>;
 
-    void print() const {
-        std::apply([](const auto&... items) {((std::cout << items << " "), ...);}, data);
-        std::cout << std::endl;
-    }
-
-    std::tuple<Types...> data; ///< The tuple data.
+    std::vector<std::type_index> typeOrder;
+    std::vector<TupleBaseTypes> data;
 };
 
 using BaseTypes = std::variant<uint256_t, std::vector<uint256_t>, int256_t, std::vector<int256_t>, Address, std::vector<Address>,
-        bool, std::vector<bool>, Bytes, BytesEncoded, std::vector<Bytes>, std::string, std::vector<std::string>, Tuple<>>;
+        bool, std::vector<bool>, Bytes, BytesEncoded, std::vector<Bytes>, std::string, std::vector<std::string>>;
 
 /**
  * ethCallInfo: tuple of (from, to, gasLimit, gasPrice, value, functor, data).
