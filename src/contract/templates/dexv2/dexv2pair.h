@@ -31,10 +31,10 @@ class DEXV2Pair : public ERC20 {
     SafeAddress token1_;
 
     /// Solidity: uint112 private _reserve0
-    SafeUint112_t reserve0_;
+    SafeUint256_t reserve0_;
 
     /// Solidity: uint112 private _reserve1
-    SafeUint112_t reserve1_;
+    SafeUint256_t reserve1_;
 
     /// Solidity: uint32 private _blockTimestampLast (seconds!)
     SafeUint32_t blockTimestampLast_;
@@ -74,7 +74,7 @@ class DEXV2Pair : public ERC20 {
      * If fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k).
      * @return `true` if fee is on, `false` otherwise.
      */
-    bool _mintFee(uint112_t reserve0, uint112_t reserve1);
+    bool _mintFee(uint256_t reserve0, uint256_t reserve1);
 
   public:
     /**

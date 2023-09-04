@@ -10,8 +10,8 @@ DEXV2Pair::DEXV2Pair(
   this->factory_ = Address(this->db->get(std::string("factory_"), this->getDBPrefix()));
   this->token0_ = Address(this->db->get(std::string("token0_"), this->getDBPrefix()));
   this->token1_ = Address(this->db->get(std::string("token1_"), this->getDBPrefix()));
-  this->reserve0_ = Utils::bytesToUint112(this->db->get(std::string("reserve0_"), this->getDBPrefix()));
-  this->reserve1_ = Utils::bytesToUint112(this->db->get(std::string("reserve1_"), this->getDBPrefix()));
+  this->reserve0_ = Utils::bytesToUint256(this->db->get(std::string("reserve0_"), this->getDBPrefix()));
+  this->reserve1_ = Utils::bytesToUint256(this->db->get(std::string("reserve1_"), this->getDBPrefix()));
   this->blockTimestampLast_ = Utils::bytesToUint32(this->db->get(std::string("blockTimestampLast_"), this->getDBPrefix()));
   this->price0CumulativeLast_ = Utils::bytesToUint256(this->db->get(std::string("price0CumulativeLast_"), this->getDBPrefix()));
   this->price1CumulativeLast_ = Utils::bytesToUint256(this->db->get(std::string("price1CumulativeLast_"), this->getDBPrefix()));
@@ -46,8 +46,8 @@ DEXV2Pair::~DEXV2Pair() {
   batchOperations.push_back(Utils::stringToBytes("factory_"), this->factory_.get().view_const(), this->getDBPrefix());
   batchOperations.push_back(Utils::stringToBytes("token0_"), this->token0_.get().view_const(), this->getDBPrefix());
   batchOperations.push_back(Utils::stringToBytes("token1_"), this->token1_.get().view_const(), this->getDBPrefix());
-  batchOperations.push_back(Utils::stringToBytes("reserve0_"), Utils::uint112ToBytes(this->reserve0_.get()), this->getDBPrefix());
-  batchOperations.push_back(Utils::stringToBytes("reserve1_"), Utils::uint112ToBytes(this->reserve1_.get()), this->getDBPrefix());
+  batchOperations.push_back(Utils::stringToBytes("reserve0_"), Utils::uint256ToBytes(this->reserve0_.get()), this->getDBPrefix());
+  batchOperations.push_back(Utils::stringToBytes("reserve1_"), Utils::uint256ToBytes(this->reserve1_.get()), this->getDBPrefix());
   batchOperations.push_back(Utils::stringToBytes("blockTimestampLast_"), Utils::uint32ToBytes(this->blockTimestampLast_.get()), this->getDBPrefix());
   batchOperations.push_back(Utils::stringToBytes("price0CumulativeLast_"), Utils::uint256ToBytes(this->price0CumulativeLast_.get()), this->getDBPrefix());
   batchOperations.push_back(Utils::stringToBytes("price1CumulativeLast_"), Utils::uint256ToBytes(this->price1CumulativeLast_.get()), this->getDBPrefix());
@@ -80,15 +80,15 @@ void DEXV2Pair::_update(const uint256_t& balance0, const uint256_t& balance1, co
   uint32_t blockTimestamp = uint32_t(this->getBlockTimestamp() / 1000000) ; /// Timestamp is in microseconds, we want in seconds
   uint32_t timeElapsed = blockTimestamp - this->blockTimestampLast_.get();
   if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
-    this->price0CumulativeLast_ += uint256_t(UQ112x112::uqdiv(UQ112x112::encode(uint112_t(reserve1)), uint112_t(reserve0))) * timeElapsed;
-    this->price1CumulativeLast_ += uint256_t(UQ112x112::uqdiv(UQ112x112::encode(uint112_t(reserve0)), uint112_t(reserve1))) * timeElapsed;
+    this->price0CumulativeLast_ += uint256_t(UQ112x112::uqdiv(UQ112x112::encode((reserve1)), (reserve0))) * timeElapsed;
+    this->price1CumulativeLast_ += uint256_t(UQ112x112::uqdiv(UQ112x112::encode((reserve0)), (reserve1))) * timeElapsed;
   }
-  this->reserve0_ = uint112_t(balance0);
-  this->reserve1_ = uint112_t(balance1);
+  this->reserve0_ = (balance0);
+  this->reserve1_ = (balance1);
   this->blockTimestampLast_ = blockTimestamp;
 }
 
-bool DEXV2Pair::_mintFee(uint112_t reserve0, uint112_t reserve1) {
+bool DEXV2Pair::_mintFee(uint256_t reserve0, uint256_t reserve1) {
   Address feeTo = this->callContractViewFunction(this->factory_.get(), &DEXV2Factory::feeTo);
   bool feeOn = (feeTo) ? true : false;
   uint256_t _kLast = this->kLast_.get();
@@ -192,14 +192,14 @@ BytesEncoded DEXV2Pair::burn(const Address& to) {
 void DEXV2Pair::swap(const uint256_t& amount0Out, const uint256_t& amount1Out, const Address& to) {
   ReentrancyGuard reentrancyGuard(this->reentrancyLock);
   if (amount0Out == 0 && amount1Out == 0) throw std::runtime_error("DEXV2Pair: INSUFFICIENT_OUTPUT_AMOUNT");
-  if (reserve0_ <= uint112_t(amount0Out) && reserve1_ <= uint112_t(amount1Out)) throw std::runtime_error("DEXV2Pair: INSUFFICIENT_LIQUIDITY");
+  if (reserve0_ <= uint256_t(amount0Out) && reserve1_ <= uint256_t(amount1Out)) throw std::runtime_error("DEXV2Pair: INSUFFICIENT_LIQUIDITY");
   if (token0_ == to || token1_ == to) throw std::runtime_error("DEXV2Pair: INVALID_TO");
   if (amount0Out > 0) this->_safeTransfer(this->token0_.get(), to, amount0Out);
   if (amount1Out > 0) this->_safeTransfer(this->token1_.get(), to, amount1Out);
   uint256_t balance0 = this->callContractViewFunction(this->token0_.get(), &ERC20::balanceOf, this->getContractAddress());
   uint256_t balance1 = this->callContractViewFunction(this->token1_.get(), &ERC20::balanceOf, this->getContractAddress());
-  uint256_t amount0In = balance0 > this->reserve0_.get() - uint112_t(amount0Out) ? balance0 - this->reserve0_.get() + uint112_t(amount0Out) : 0;
-  uint256_t amount1In = balance1 > this->reserve1_.get() - uint112_t(amount1Out) ? balance1 - this->reserve1_.get() + uint112_t(amount1Out) : 0;
+  uint256_t amount0In = balance0 > this->reserve0_.get() - uint256_t(amount0Out) ? balance0 - this->reserve0_.get() + uint256_t(amount0Out) : 0;
+  uint256_t amount1In = balance1 > this->reserve1_.get() - uint256_t(amount1Out) ? balance1 - this->reserve1_.get() + uint256_t(amount1Out) : 0;
   if (amount0In == 0 && amount1In == 0) throw std::runtime_error("DEXV2Pair: INSUFFICIENT_INPUT_AMOUNT");
   uint256_t balance0Adjusted = balance0 * 1000 - amount0In * 3;
   uint256_t balance1Adjusted = balance1 * 1000 - amount1In * 3;
