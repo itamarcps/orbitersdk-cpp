@@ -11,7 +11,12 @@ std::string parseJsonRpcRequest(
   uint64_t id = 0;
   try {
     Utils::safePrint("HTTP Request: " + body);
-    json request = json::parse(body);
+    json request;
+    try {
+      request = json::parse(body);
+    } catch (json::parse_error& ex) {
+      throw std::runtime_error(ex.what());
+    }
     Utils::safePrint("HTTP Request Parsed!");
     if (!JsonRPC::Decoding::checkJsonRPCSpec(request)) {
       ret["error"]["code"] = -32600;
