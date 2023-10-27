@@ -42,6 +42,7 @@ configure_file(
 set(BUILD_TESTS ON CACHE BOOL "Build helper unit testing program")
 set(BUILD_DISCOVERY ON CACHE BOOL "Build helper discovery node program")
 set(BUILD_AVALANCHEGO OFF CACHE BOOL "Build with AvalancheGo wrapping")
+set(BUILD_COSMOS ON CACHE BOOL "Build with CometBFT wrapping")
 set(BUILD_TOOLS OFF CACHE BOOL "Build tools related to subnet")
 set(USE_LINT OFF CACHE BOOL "Run linter on compile (clang-tidy)")
 if(USE_LINT)
@@ -95,11 +96,11 @@ target_include_directories(catch2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/catch2)
 include(cmake/CheckSizes.cmake)
 
 # Add AvalancheGo wrapper dependencies if compiling it
-if(BUILD_AVALANCHEGO)
-  find_package(Absl REQUIRED) # Built-in is hardcoded to SHARED, this one to STATIC
+if(BUILD_AVALANCHEGO OR BUILD_COSMOS)
+  find_package(absl REQUIRED) # Built-in is hardcoded to SHARED, this one to STATIC
   find_package(Cares REQUIRED)
   find_package(Protobuf 3.12 REQUIRED)
-  find_package(GRPC REQUIRED)
+  find_package(gRPC REQUIRED)
 endif()
 
 # Include directories for headers and libs
@@ -126,8 +127,235 @@ add_subdirectory(src/net)
 add_subdirectory(src/utils)
 add_subdirectory(tests)
 
+
+# gRPC files for Cosmos
 # Generate gRPC files if building with support for AvalancheGo.
 # Headers/sources are always cleaned at configure so they can be regenerated at build
+if(BUILD_COSMOS)
+  file(REMOVE
+      "${CMAKE_SOURCE_DIR}/proto/abci-types.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/abci-types.grpc.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/abci-types.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/abci-types.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-proof.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-proof.grpc.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-proof.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-proof.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-keys.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-keys.grpc.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-keys.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/crypto-keys.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/types-params.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/types-params.grpc.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/types-params.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/types-params.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/types-validator.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/types-validator.grpc.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/types-validator.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/types-validator.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/gogo.grpc.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/gogo.grpc.pb.h"
+      "${CMAKE_SOURCE_DIR}/proto/gogo.pb.cc"
+      "${CMAKE_SOURCE_DIR}/proto/gogo.pb.h"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/abci-types.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/abci-types.grpc.pb.h"
+    COMMAND "protoc"
+    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/abci-types.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/crypto-proof.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/crypto-proof.grpc.pb.h"
+    COMMAND "protoc"
+    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/crypto-proof.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/gogo.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/gogo.grpc.pb.h"
+    COMMAND "protoc"
+    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/gogo.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/crypto-keys.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/crypto-keys.grpc.pb.h"
+    COMMAND "protoc"
+    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/crypto-keys.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/types-params.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/types-params.grpc.pb.h"
+    COMMAND "protoc"
+    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/types-params.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/types-validator.grpc.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/types-validator.grpc.pb.h"
+    COMMAND "protoc"
+    ARGS --grpc_out="${CMAKE_SOURCE_DIR}/proto"
+         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/types-validator.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/abci-types.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/abci-types.pb.h"
+    COMMAND "protoc"
+    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/abci-types.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/crypto-proof.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/crypto-proof.pb.h"
+    COMMAND "protoc"
+    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/crypto-proof.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/gogo.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/gogo.pb.h"
+    COMMAND "protoc"
+    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/gogo.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/crypto-keys.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/crypto-keys.pb.h"
+    COMMAND "protoc"
+    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/crypto-keys.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/types-params.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/types-params.pb.h"
+    COMMAND "protoc"
+    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/types-params.proto"
+  )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_SOURCE_DIR}/proto/types-validator.pb.cc"
+           "${CMAKE_SOURCE_DIR}/proto/types-validator.pb.h"
+    COMMAND "protoc"
+    ARGS --cpp_out="${CMAKE_SOURCE_DIR}/proto"
+         --proto_path="${CMAKE_SOURCE_DIR}/proto"
+         "${CMAKE_SOURCE_DIR}/proto/types-validator.proto"
+  )
+
+  add_library(CometProtoFiles
+    "${CMAKE_SOURCE_DIR}/proto/abci-types.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/abci-types.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-proof.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-proof.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/gogo.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/gogo.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-keys.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-keys.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/types-params.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/types-params.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/types-validator.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/types-validator.pb.h"
+  )
+
+  add_library(CometGenGrpc
+    "${CMAKE_SOURCE_DIR}/proto/abci-types.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/abci-types.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-proof.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-proof.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/gogo.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/gogo.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-keys.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/crypto-keys.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/types-params.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/types-params.grpc.pb.h"
+    "${CMAKE_SOURCE_DIR}/proto/types-validator.grpc.pb.cc"
+    "${CMAKE_SOURCE_DIR}/proto/types-validator.grpc.pb.h"
+    ${CometProtoFiles}
+  )
+  target_link_libraries(CometGenGrpc PUBLIC ${Protobuf_LIBRARIES} gRPC::grpc gRPC::grpc++ ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} CometProtoFiles absl::flags)
+
+  add_library(orbitersdk_lib STATIC
+    ${UTILS_HEADERS}
+    ${UTILS_SOURCES}
+    ${CONTRACT_HEADERS}
+    ${CONTRACT_SOURCES}
+    ${CORE_HEADERS}
+    ${CORE_SOURCES}
+    ${NET_HEADERS}
+    ${NET_SOURCES}
+  )
+
+  add_dependencies(orbitersdk_lib CometGenGrpc CometProtoFiles)
+
+  target_include_directories(orbitersdk_lib PUBLIC ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR})
+
+  target_link_libraries(orbitersdk_lib PRIVATE
+    ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS} ${Protobuf_LIBRARIES}
+    gRPC::grpc gRPC::grpc++ gRPC::grpc++_reflection ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags
+    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES}
+  )
+
+  set_target_properties(orbitersdk_lib PROPERTIES COMPILE_FLAGS "-DCOSMOS_COMPATIBLE=1")
+
+  # Compile and link the executable
+  add_executable(orbitersdkd "${CMAKE_SOURCE_DIR}/src/main-cosmos.cpp" "${CMAKE_SOURCE_DIR}/src/abci.cpp" "${CMAKE_SOURCE_DIR}/src/abci.h")
+  set_target_properties(orbitersdkd PROPERTIES COMPILE_FLAGS "-DCOSMOS_COMPATIBLE=1")
+
+  add_dependencies(orbitersdkd orbitersdk_lib CometGenGrpc CometProtoFiles)
+  target_include_directories(orbitersdkd PRIVATE orbitersdk_lib ${OPENSSL_INCLUDE_DIR})
+  target_link_libraries(orbitersdkd
+    orbitersdk_lib
+    ${Protobuf_LIBRARIES} gRPC::grpc gRPC::grpc++ gRPC::grpc++_reflection  ${CARES_LIBRARY} Speedb
+    ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
+    absl::flags Secp256k1 Ethash ${ETHASH_BYPRODUCTS} CometGenGrpc CometProtoFiles
+  )
+
+  # Compile and link the ABI generator executable
+  add_executable(contractabigenerator "${CMAKE_SOURCE_DIR}/src/main-contract-abi.cpp")
+
+  add_dependencies(contractabigenerator orbitersdk_lib)
+  target_include_directories(contractabigenerator PRIVATE orbitersdk_lib ${OPENSSL_INCLUDE_DIR})
+  target_link_libraries(contractabigenerator
+    orbitersdk_lib Speedb ${SNAPPY_LIBRARY} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
+  )
+
+  # TODO: Implement tests for Comet compilation.
+  return()
+endif()
+
+
+# gRPC files for AvaxGo
 if(BUILD_AVALANCHEGO)
   file(REMOVE
     "${CMAKE_SOURCE_DIR}/proto/vm.grpc.pb.cc"
@@ -364,7 +592,7 @@ if(BUILD_AVALANCHEGO)
     ${ProtoFiles}
   )
 
-  target_link_libraries(gen-grpc PUBLIC ${Protobuf_LIBRARIES} ${GRPC_LIBRARIES} ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags)
+  target_link_libraries(gen-grpc PUBLIC ${Protobuf_LIBRARIES} ${gRPC_LIBRARIES} ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags)
 
   add_library(orbitersdk_lib STATIC
     ${UTILS_HEADERS}
@@ -383,7 +611,7 @@ if(BUILD_AVALANCHEGO)
 
   target_link_libraries(orbitersdk_lib PRIVATE
     ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS} ${Protobuf_LIBRARIES}
-    ${GRPC_LIBRARIES} ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags
+    ${gRPC_LIBRARIES} ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags
     Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES}
   )
 
@@ -396,7 +624,7 @@ if(BUILD_AVALANCHEGO)
   target_include_directories(orbitersdkd PRIVATE orbitersdk_lib ${OPENSSL_INCLUDE_DIR})
   target_link_libraries(orbitersdkd
     orbitersdk_lib
-    ${Protobuf_LIBRARIES} ${GRPC_LIBRARIES} ${CARES_LIBRARY} Speedb
+    ${Protobuf_LIBRARIES} ${gRPC_LIBRARIES} ${CARES_LIBRARY} Speedb
     ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES}
     absl::flags Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
   )

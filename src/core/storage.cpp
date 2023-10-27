@@ -98,7 +98,11 @@ void Storage::initializeBlockchain() {
     // Genesis Keys:
     // Private: 0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867
     // Address: 0x00dead00665771855a34155f5e7405489df2c3c6
+#ifndef COSMOS_COMPATIBLE
     genesis.finalize(PrivKey(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867")), 1656356646000000);
+#else
+    genesis.finalize(PrivKey(Hex::toBytes("0xe89ef6409c467285bcae9f80ab1cfeb3487cfe61ab28fb7d36443e1daa0c2867")));
+#endif
     this->db_->put(std::string("latest"), genesis.serializeBlock(), DBPrefix::blocks);
     this->db_->put(Utils::uint64ToBytes(genesis.getNHeight()), genesis.hash().get(), DBPrefix::blockHeightMaps);
     this->db_->put(genesis.hash().get(), genesis.serializeBlock(), DBPrefix::blocks);

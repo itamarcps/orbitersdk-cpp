@@ -6,7 +6,9 @@ See the LICENSE.txt file in the project root for more information.
 */
 
 #include "block.h"
+#ifndef COSMOS_COMPATIBLE
 #include "../core/rdpos.h"
+#endif
 
 Block::Block(const BytesArrView bytes, const uint64_t& requiredChainId) {
   try {
@@ -113,16 +115,20 @@ Block::Block(const BytesArrView bytes, const uint64_t& requiredChainId) {
     // Sanity check the Merkle roots, block randomness and signature
     auto expectedTxMerkleRoot = Merkle(this->txs_).getRoot();
     auto expectedValidatorMerkleRoot = Merkle(this->txValidators_).getRoot();
+#ifndef COSMOS_COMPATIBLE
     auto expectedRandomness = rdPoS::parseTxSeedList(this->txValidators_);
+#endif
     if (expectedTxMerkleRoot != this->txMerkleRoot_) {
       throw std::runtime_error("Invalid tx merkle root");
     }
     if (expectedValidatorMerkleRoot != this->validatorMerkleRoot_) {
       throw std::runtime_error("Invalid validator merkle root");
     }
+#ifndef COSMOS_COMPATIBLE
     if (expectedRandomness != this->blockRandomness_) {
       throw std::runtime_error("Invalid block randomness");
     }
+#endif
     Hash msgHash = this->hash();
     if (!Secp256k1::verifySig(
       this->validatorSig_.r(), this->validatorSig_.s(), this->validatorSig_.v()
@@ -213,7 +219,7 @@ bool Block::appendTxValidator(const TxValidator &tx) {
   this->txValidators_.push_back(tx);
   return true;
 }
-
+#ifndef COSMOS_COMPATIBLE
 bool Block::finalize(const PrivKey& validatorPrivKey, const uint64_t& newTimestamp) {
   if (this->finalized_) {
     Logger::logToDebug(LogType::ERROR, Log::block, __func__, "Block is already finalized");
@@ -236,4 +242,19 @@ bool Block::finalize(const PrivKey& validatorPrivKey, const uint64_t& newTimesta
   this->finalized_ = true;
   return true;
 }
+#else
+bool Block::finalize(const PrivKey& validatorPrivKey) {
+  if (this->finalized_) {
+    Logger::logToDebug(LogType::ERROR, Log::block, __func__, "Block is already finalized");
+    return false;
+  }
+  this->txMerkleRoot_ = Merkle(this->txs_).getRoot();
+  this->validatorMerkleRoot_ = Merkle(this->txValidators_).getRoot();
+  this->validatorSig_ = Secp256k1::sign(this->hash(), validatorPrivKey);
+  this->validatorPubKey_ = Secp256k1::recover(this->validatorSig_, this->hash());
+  this->finalized_ = true;
+  return true;
+}
+
+#endif
 

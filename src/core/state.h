@@ -1,6 +1,5 @@
 /*
 Copyright (c) [2023] [Sparq Network]
-
 This software is distributed under the MIT License.
 See the LICENSE.txt file in the project root for more information.
 */
@@ -13,7 +12,9 @@ See the LICENSE.txt file in the project root for more information.
 #include "../utils/utils.h"
 #include "../utils/db.h"
 #include "storage.h"
+#ifndef COSMOS_COMPATIBLE
 #include "rdpos.h"
+#endif
 
 // TODO: We could possibly change the bool functions
 // into a enum function, to be able to properly return each error case
@@ -33,11 +34,14 @@ class State {
     /// Pointer to the blockchain's storage.
     const std::unique_ptr<Storage>& storage_;
 
+#ifndef COSMOS_COMPATIBLE
+    /// If Cosmos compatible, we rely on CometBFT for consensus and P2P.
     /// Pointer to the rdPoS object.
     const std::unique_ptr<rdPoS>& rdpos_;
 
     /// Pointer to the P2P connection manager.
     const std::unique_ptr<P2P::ManagerNormal> &p2pManager_;
+#endif
 
     /// Pointer to the options singleton.
     const std::unique_ptr<Options>& options_;
@@ -85,6 +89,8 @@ class State {
     bool processingPayable_ = false;
 
   public:
+
+#ifndef COSMOS_COMPATIBLE
     /**
      * Constructor.
      * @param db Pointer to the database.
@@ -101,7 +107,22 @@ class State {
       const std::unique_ptr<P2P::ManagerNormal>& p2pManager,
       const std::unique_ptr<Options>& options
     );
-
+#else
+    /**
+     * Constructor.
+     * @param db Pointer to the database.
+     * @param storage Pointer to the blockchain's storage.
+     * @param rdpos Pointer to the rdPoS object.
+     * @param p2pManager Pointer to the P2P connection manager.
+     * @param options Pointer to the options singleton.
+     * @throw std::runtime_error on any database size mismatch.
+     */
+    State(
+      const std::unique_ptr<DB>& db,
+      const std::unique_ptr<Storage>& storage,
+      const std::unique_ptr<Options>& options
+    );
+#endif
     /// Destructor.
     ~State();
 
@@ -169,12 +190,14 @@ class State {
      */
     TxInvalid addTx(TxBlock&& tx);
 
+#ifndef COSMOS_COMPATIBLE
     /**
      * Add a Validator transaction to the rdPoS mempool, if valid.
      * @param tx The transaction to add.
      * @return `true` if transaction is valid, `false` otherwise.
      */
     bool addValidatorTx(const TxValidator& tx);
+#endif
 
     /**
      * Check if a transaction is in the mempool.

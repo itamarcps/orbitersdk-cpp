@@ -7,6 +7,7 @@ See the LICENSE.txt file in the project root for more information.
 
 #include "state.h"
 
+#ifndef COSMOS_COMPATIBLE
 State::State(
   const std::unique_ptr<DB>& db,
   const std::unique_ptr<Storage>& storage,
@@ -54,6 +55,53 @@ contractManager_(std::make_unique<ContractManager>(this, db, rdpos, options))
     this->accounts_.insert({Address(dbEntry.key), Account(std::move(balance), std::move(nonce))});
   }
 }
+#else
+State::State(
+  const std::unique_ptr<DB>& db,
+  const std::unique_ptr<Storage>& storage,
+  const std::unique_ptr<Options>& options
+) : db_(db), storage_(storage), options_(options),
+    contractManager_(std::make_unique<ContractManager>(this, db, options))
+{
+  std::unique_lock lock(this->stateMutex_);
+  auto accountsFromDB = db->getBatch(DBPrefix::nativeAccounts);
+  if (accountsFromDB.empty()) {
+    // Initialize with 0x00dead00665771855a34155f5e7405489df2c3c6 with nonce 0.
+    Address dev1(Hex::toBytes("0x00dead00665771855a34155f5e7405489df2c3c6"));
+    // See ~State for encoding
+    uint256_t desiredBalance("1000000000000000000000");
+    Bytes value = Utils::uintToBytes(Utils::bytesRequired(desiredBalance));
+    Utils::appendBytes(value,Utils::uintToBytes(desiredBalance));
+    value.insert(value.end(), 0x00);
+    db->put(dev1.get(), value, DBPrefix::nativeAccounts);
+    accountsFromDB = db->getBatch(DBPrefix::nativeAccounts);
+  }
+
+  for (auto const dbEntry : accountsFromDB) {
+    BytesArrView data(dbEntry.value);
+    if (dbEntry.key.size() != 20) {
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Error when loading State from DB, address from DB size mismatch");
+      throw std::runtime_error("Error when loading State from DB, address from DB size mismatch");
+    }
+    uint8_t balanceSize = Utils::fromBigEndian<uint8_t>(data.subspan(0,1));
+    if (data.size() + 1 < data.size()) {
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Error when loading State from DB, value from DB doesn't size mismatch on balanceSize");
+      throw std::runtime_error("Error when loading State from DB, value from DB size mismatch on balanceSize");
+    }
+
+    uint256_t balance = Utils::fromBigEndian<uint256_t>(data.subspan(1, balanceSize));
+    uint8_t nonceSize = Utils::fromBigEndian<uint8_t>(data.subspan(1 + balanceSize, 1));
+
+    if (2 + balanceSize + nonceSize != data.size()) {
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Error when loading State from DB, value from DB doesn't size mismatch on nonceSize");
+      throw std::runtime_error("Error when loading State from DB, value from DB size mismatch on nonceSize");
+    }
+    uint64_t nonce = Utils::fromBigEndian<uint64_t>(data.subspan(2 + balanceSize, nonceSize));
+
+    this->accounts_.insert({Address(dbEntry.key), Account(std::move(balance), std::move(nonce))});
+  }
+}
+#endif
 
 State::~State() {
   /// DB is stored as following
@@ -239,10 +287,12 @@ bool State::validateNextBlock(const Block& block) const {
     return false;
   }
 
+#ifndef COSMOS_COMPATIBLE
   if (!this->rdpos_->validateBlock(block)) {
     Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Invalid rdPoS in block");
     return false;
   }
+#endif
 
   std::shared_lock verifyingBlockTxs(this->stateMutex_);
   for (const auto& tx : block.getTxs()) {
@@ -276,7 +326,9 @@ void State::processNextBlock(Block&& block) {
   for (auto const& tx : block.getTxs()) this->processTransaction(tx);
 
   // Process rdPoS State
+#ifndef COSMOS_COMPATIBLE
   this->rdpos_->processBlock(block);
+#endif
 
   // Refresh the mempool based on the block transactions
   this->refreshMempool(block);
@@ -310,10 +362,12 @@ TxInvalid State::addTx(TxBlock&& tx) {
   return TxInvalid;
 }
 
+#ifndef COSMOS_COMPATIBLE
 bool State::addValidatorTx(const TxValidator& tx) {
   std::unique_lock lock(this->stateMutex_);
   return this->rdpos_->addValidatorTx(tx);
 }
+#endif
 
 bool State::isTxInMempool(const Hash& txHash) const {
   std::shared_lock lock(this->stateMutex_);

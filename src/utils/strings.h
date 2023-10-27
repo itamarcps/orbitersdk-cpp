@@ -75,6 +75,9 @@ template <unsigned N> class FixedBytes {
 
     /// Create a Bytes object from the data string.
     inline const Bytes asBytes() const { return Bytes(this->data_.begin(), this->data_.end()); }
+
+    /// Create a literal std::string from the data string.
+    inline const std::string asString() const { return std::string(this->data_.begin(), this->data_.end()); }
     /**
      * Getter for `data`, but returns the data in hex format.
      * @param strict If `true`, returns the value with an appended "0x" prefix.

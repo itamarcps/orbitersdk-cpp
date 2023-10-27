@@ -222,7 +222,11 @@ class Block {
      * will be generated for the next block.
      * @return `true` on success, `false` if block is already finalized_.
      */
+#ifndef COSMOS_COMPATIBLE
     bool finalize(const PrivKey& validatorPrivKey, const uint64_t& newTimestamp);
+#else
+    bool finalize(const PrivKey& validatorPrivKey);
+#endif
 
     /// Equality operator. Checks the block hash of both objects.
     const bool operator==(const Block& b) const { return this->hash() == b.hash(); }

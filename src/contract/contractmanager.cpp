@@ -12,6 +12,7 @@ See the LICENSE.txt file in the project root for more information.
 #include "../core/rdpos.h"
 #include "../core/state.h"
 
+#ifndef COSMOS_COMPATIBLE
 ContractManager::ContractManager(
   State* state, const std::unique_ptr<DB>& db,
   const std::unique_ptr<rdPoS>& rdpos, const std::unique_ptr<Options>& options
@@ -34,6 +35,28 @@ ContractManager::ContractManager(
     }
   }
 }
+#else
+ContractManager::ContractManager(
+  State* state, const std::unique_ptr<DB>& db, const std::unique_ptr<Options>& options
+) : state_(state), BaseContract("ContractManager", ProtocolContractAddresses.at("ContractManager"),
+                                Address(Hex::toBytes("0x00dead00665771855a34155f5e7405489df2c3c6")), 0, db),
+    options_(options),
+    factory_(std::make_unique<ContractFactory>(*this)),
+    interface_(std::make_unique<ContractManagerInterface>(*this))
+{
+  this->callLogger_ = std::make_unique<ContractCallLogger>(*this);
+  this->factory_->registerContracts<ContractTypes>();
+  this->factory_->addAllContractFuncs<ContractTypes>();
+  // Load Contracts from DB
+  std::vector<DBEntry> contractsFromDB = this->db_->getBatch(DBPrefix::contractManager);
+  for (const DBEntry& contract : contractsFromDB) {
+    Address address(contract.key);
+    if (!this->loadFromDB<ContractTypes>(contract, address)) {
+      throw std::runtime_error("Unknown contract: " + Utils::bytesToString(contract.value));
+    }
+  }
+}
+#endif
 
 ContractManager::~ContractManager() {
   DBBatch contractsBatch;
@@ -110,6 +133,7 @@ void ContractManager::callContract(const TxBlock& tx) {
     return;
   }
 
+#ifndef COSMOS_COMPATIBLE
   if (to == ProtocolContractAddresses.at("rdPoS")) {
     this->callLogger_->setContractVars(rdpos_.get(), from, from, value);
     try {
@@ -122,6 +146,7 @@ void ContractManager::callContract(const TxBlock& tx) {
     this->callLogger_.reset();
     return;
   }
+#endif
 
   std::unique_lock lock(this->contractsMutex_);
   auto it = this->contracts_.find(to);
@@ -149,7 +174,9 @@ void ContractManager::callContract(const TxBlock& tx) {
 const Bytes ContractManager::callContract(const ethCallInfo& callInfo) const {
   const auto& [from, to, gasLimit, gasPrice, value, functor, data] = callInfo;
   if (to == this->getContractAddress()) return this->ethCallView(callInfo);
+#ifndef COSMOS_COMPATIBLE
   if (to == ProtocolContractAddresses.at("rdPoS")) return rdpos_->ethCallView(callInfo);
+#endif
   std::shared_lock lock(this->contractsMutex_);
   if (!this->contracts_.contains(to)) {
     throw std::runtime_error(std::string(__func__) + "(Bytes): Contract does not exist");
@@ -184,12 +211,14 @@ bool ContractManager::validateCallContractWithTx(const ethCallInfo& callInfo) {
       return true;
     }
 
+#ifndef COSMOS_COMPATIBLE
     if (to == ProtocolContractAddresses.at("rdPoS")) {
       this->callLogger_->setContractVars(rdpos_.get(), from, from, value);
       rdpos_->ethCall(callInfo);
       this->callLogger_.reset();
       return true;
     }
+#endif
 
     std::shared_lock lock(this->contractsMutex_);
     if (!this->contracts_.contains(to)) {

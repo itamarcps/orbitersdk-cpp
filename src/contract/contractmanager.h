@@ -75,8 +75,10 @@ class ContractManager : BaseContract {
      */
     std::unique_ptr<ContractCallLogger> callLogger_;
 
+#ifndef COSMOS_COMPATIBLE
     /// Reference pointer to the rdPoS contract.
     const std::unique_ptr<rdPoS>& rdpos_;
+#endif
 
     /// Reference pointer to the options singleton.
     const std::unique_ptr<Options>& options_;
@@ -143,6 +145,7 @@ class ContractManager : BaseContract {
     }
 
   public:
+#ifndef COSMOS_COMPATIBLE
     /**
      * Constructor. Automatically loads contracts from the database and deploys them.
      * @param state Raw pointer to the state.
@@ -154,6 +157,17 @@ class ContractManager : BaseContract {
       State* state, const std::unique_ptr<DB>& db,
       const std::unique_ptr<rdPoS>& rdpos, const std::unique_ptr<Options>& options
     );
+#else
+    /**
+     * Constructor. Automatically loads contracts from the database and deploys them.
+     * @param state Raw pointer to the state.
+     * @param db Pointer to the database.
+     * @param options Pointer to the options singleton.
+     */
+    ContractManager(
+      State* state, const std::unique_ptr<DB>& db, const std::unique_ptr<Options>& options
+    );
+#endif
 
     /// Destructor. Automatically saves contracts to the database before wiping them.
     ~ContractManager() override;
