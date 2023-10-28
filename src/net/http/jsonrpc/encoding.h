@@ -12,10 +12,14 @@ See the LICENSE.txt file in the project root for more information.
 #include "../../../utils/block.h"
 #include "../../../utils/tx.h"
 #include "../../../utils/options.h"
+#ifndef COSMOS_COMPATIBLE
 #include "../../p2p/managernormal.h"
+#endif
 
 // Forward declarations.
+#ifndef COSMOS_COMPATIBLE
 namespace P2P { class ManagerNormal; }
+#endif
 class Storage;
 class State;
 
@@ -66,7 +70,11 @@ namespace JsonRPC {
      * @param manager Pointer to the P2P connection manager.
      * @return The encoded JSON response.
      */
-    json net_peerCount(const std::unique_ptr<P2P::ManagerNormal>& manager);
+    json net_peerCount(
+#ifndef COSMOS_COMPATIBLE
+      const std::unique_ptr<P2P::ManagerNormal>& manager
+#endif
+      );
 
     /**
      * Encode a `eth_protocolVersion` response.
@@ -199,7 +207,10 @@ namespace JsonRPC {
      */
     // TODO: WAITING FOR BLOCKCHAIN
     json eth_sendRawTransaction(
-      const TxBlock& tx, const std::unique_ptr<State>& state, const std::unique_ptr<P2P::ManagerNormal>& p2p
+      const TxBlock& tx, const std::unique_ptr<State>& state
+#ifndef COSMOS_COMPATIBLE
+      , const std::unique_ptr<P2P::ManagerNormal>& p2p
+#endif
     );
 
     /**

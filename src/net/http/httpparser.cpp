@@ -11,7 +11,9 @@ std::string parseJsonRpcRequest(
   const std::string& body,
   const std::unique_ptr<State>& state,
   const std::unique_ptr<Storage>& storage,
+#ifndef COSMOS_COMPATIBLE
   const std::unique_ptr<P2P::ManagerNormal>& p2p,
+#endif
   const std::unique_ptr<Options>& options
 ) {
   json ret;
@@ -49,7 +51,11 @@ std::string parseJsonRpcRequest(
         break;
       case JsonRPC::Methods::net_peerCount:
         JsonRPC::Decoding::net_peerCount(request);
-        ret = JsonRPC::Encoding::net_peerCount(p2p);
+        ret = JsonRPC::Encoding::net_peerCount(
+#ifndef COSMOS_COMPATIBLE
+          p2p
+#endif
+          );
         break;
       case JsonRPC::Methods::eth_protocolVersion:
         JsonRPC::Decoding::eth_protocolVersion(request);
@@ -123,7 +129,10 @@ std::string parseJsonRpcRequest(
       case JsonRPC::Methods::eth_sendRawTransaction:
         ret = JsonRPC::Encoding::eth_sendRawTransaction(
           JsonRPC::Decoding::eth_sendRawTransaction(request, options->getChainID()),
-          state, p2p
+          state
+#ifndef COSMOS_COMPATIBLE
+          , p2p
+#endif
         );
         break;
       case JsonRPC::Methods::eth_getTransactionByHash:

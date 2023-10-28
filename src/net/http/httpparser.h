@@ -58,8 +58,10 @@ using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 // The parser functions never access any of these members, only passes them around.
 class State;
 class Storage;
+#ifndef COSMOS_COMPATIBLE
 namespace P2P { class ManagerNormal; }
-
+#endif
+#ifndef COSMOS_COMPATIBLE
 /**
  * Parse a JSON-RPC request into a JSON-RPC response, handling all requests and errors.
  * @param body The request string.
@@ -76,6 +78,14 @@ std::string parseJsonRpcRequest(
   const std::unique_ptr<P2P::ManagerNormal>& p2p,
   const std::unique_ptr<Options>& options
 );
+#else
+std::string parseJsonRpcRequest(
+  const std::string& body,
+  const std::unique_ptr<State>& state,
+  const std::unique_ptr<Storage>& storage,
+  const std::unique_ptr<Options>& options
+);
+#endif
 
 /**
  * Produce an HTTP response for a given request.
@@ -89,11 +99,15 @@ std::string parseJsonRpcRequest(
  * @param p2p Reference pointer to the P2P connection manager.
  * @param options Reference pointer to the options singleton.
  */
-template<class Body, class Allocator, class Send> void handle_request(
+template<class Body, class Allocator, class Send>
+void handle_request(
     beast::string_view docroot,
     http::request<Body, http::basic_fields<Allocator>>&& req,
     Send&& send, const std::unique_ptr<State>& state, const std::unique_ptr<Storage>& storage,
-    const std::unique_ptr<P2P::ManagerNormal>& p2p, const std::unique_ptr<Options>& options
+#ifndef COSMOS_COMPATIBLE
+    const std::unique_ptr<P2P::ManagerNormal>& p2p,
+#endif
+    const std::unique_ptr<Options>& options
 ) {
   // Returns a bad request response
   const auto bad_request = [&req](beast::string_view why){
@@ -152,7 +166,11 @@ template<class Body, class Allocator, class Send> void handle_request(
   }
 
   std::string request = req.body();
+#ifndef COSMOS_COMPATIBLE
   std::string answer = parseJsonRpcRequest(request, state, storage, p2p, options);
+#else
+  std::string answer = parseJsonRpcRequest(request, state, storage, options);
+#endif
 
   http::response<http::string_body> res{http::status::ok, req.version()};
   res.set(http::field::server, BOOST_BEAST_VERSION_STRING);

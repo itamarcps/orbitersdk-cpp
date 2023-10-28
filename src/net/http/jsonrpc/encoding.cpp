@@ -98,10 +98,14 @@ namespace JsonRPC {
       return ret;
     }
 
-    json net_peerCount(const std::unique_ptr<P2P::ManagerNormal>& manager) {
+    json net_peerCount(
+#ifndef COSMOS_COMPATIBLE
+      const std::unique_ptr<P2P::ManagerNormal>& manager
+#endif
+      ) {
       json ret;
       ret["jsonrpc"] = 2.0;
-      ret["result"] = Hex::fromBytes(Utils::uintToBytes(manager->getPeerCount()), true).forRPC();
+      ret["result"] = Hex::fromBytes(Utils::uintToBytes(uint256_t(1)), true).forRPC();
       return ret;
     }
 
@@ -228,7 +232,11 @@ namespace JsonRPC {
       return ret;
     }
 
-    json eth_sendRawTransaction(const TxBlock& tx, const std::unique_ptr<State>& state, const std::unique_ptr<P2P::ManagerNormal>& p2p) {
+    json eth_sendRawTransaction(const TxBlock& tx, const std::unique_ptr<State>& state
+#ifndef COSMOS_COMPATIBLE
+                                , const std::unique_ptr<P2P::ManagerNormal>& p2p
+#endif
+                                ) {
       json ret;
       ret["jsonrpc"] = "2.0";
       auto txHash = tx.hash();
@@ -238,7 +246,9 @@ namespace JsonRPC {
         ret["result"] = txHash.hex(true);
         // TODO: Make this use threadpool instead of blocking
         // TODO: Make tx broadcasting better, the current solution is not good.
+#ifndef COSMOS_COMPATIBLE
         p2p->broadcastTxBlock(tx);
+#endif
       } else {
         ret["error"]["code"] = -32000;
         switch (TxInvalid) {

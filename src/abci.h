@@ -25,6 +25,8 @@
 
 #include "core/storage.h"
 #include "core/state.h"
+#include "net/http/httpserver.h"
+
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
@@ -85,6 +87,7 @@ class CometBlockchain {
     std::unique_ptr<DB> db_;
     std::unique_ptr<Storage> storage_;
     std::unique_ptr<State> state_;
+    std::unique_ptr<HTTPServer> httpServer_;
     /// newBestBlock_ is created by FinalizeBlock
     /// and commited to State with CommitBlock
     std::unique_ptr<Block> newBestBlock_;

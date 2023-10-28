@@ -154,6 +154,8 @@ void CometBlockchain::initializeBlockchain() {
   this->db_ = std::make_unique<DB>(blockchainPath_ + "/database");
   this->storage_ = std::make_unique<Storage>(this->db_, this->options_);
   this->state_ = std::make_unique<State>(this->db_, this->storage_, this->options_);
+  this->httpServer_ = std::make_unique<HTTPServer>(this->state_, this->storage_, this->options_);
+  this->httpServer_->start();
 }
 
 void CometBlockchain::checkTx(const tendermint::abci::RequestCheckTx* request, tendermint::abci::ResponseCheckTx* response) {

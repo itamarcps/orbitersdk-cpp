@@ -272,10 +272,10 @@ namespace JsonRPC {
               if (!std::regex_match(block, numFilter)) throw std::runtime_error(
                 "Invalid block number"
               );
-              uint64_t blockNum = uint64_t(Hex(block).getUint());
-              if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
-                "Only latest block is supported"
-              );
+              //uint64_t blockNum = uint64_t(Hex(block).getUint());
+              //if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
+              //  "Only latest block is supported"
+              //);
             }
           }
         } else if (request["params"].is_object()) {
@@ -348,10 +348,10 @@ namespace JsonRPC {
               if (!std::regex_match(block, numFilter)) throw std::runtime_error(
                 "Invalid block number"
               );
-              uint64_t blockNum = uint64_t(Hex(block).getUint());
-              if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
-                "Only latest block is supported"
-              );
+              //uint64_t blockNum = uint64_t(Hex(block).getUint());
+              //if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
+              //  "Only latest block is supported"
+              //);
             }
           }
         } else if (request["params"].is_object()) {
@@ -435,10 +435,10 @@ namespace JsonRPC {
           if (!std::regex_match(block, numFilter)) throw std::runtime_error(
             "Invalid block number"
           );
-          uint64_t blockNum = uint64_t(Hex(block).getUint());
-          if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
-            "Only latest block is supported"
-          );
+          //uint64_t blockNum = uint64_t(Hex(block).getUint());
+          //if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
+          //  "Only latest block is supported"
+          //);
         }
         if (!std::regex_match(address, addFilter)) throw std::runtime_error("Invalid address hex");
         return Address(Hex::toBytes(address));
@@ -455,16 +455,17 @@ namespace JsonRPC {
       static const std::regex numFilter("^0x([1-9a-f]+[0-9a-f]*|0)$");
       try {
         const auto address = request["params"].at(0).get<std::string>();
-        const auto block = request["params"].at(1).get<std::string>();
-        if (block != "latest") {
-          if (!std::regex_match(block, numFilter)) throw std::runtime_error(
-            "Invalid block number"
-          );
-          uint64_t blockNum = uint64_t(Hex(block).getUint());
-          if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
-            "Only latest block is supported"
-          );
-        }
+        // ignore latest block
+        //const auto block = request["params"].at(1).get<std::string>();
+        //if (block != "latest") {
+        //  if (!std::regex_match(block, numFilter)) throw std::runtime_error(
+        //    "Invalid block number"
+        //  );
+        //  uint64_t blockNum = uint64_t(Hex(block).getUint());
+        //  if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
+        //    "Only latest block is supported"
+        //  );
+        //}
         if (!std::regex_match(address, addFilter)) throw std::runtime_error("Invalid address hex");
         return Address(Hex::toBytes(address));
       } catch (std::exception& e) {
@@ -485,10 +486,10 @@ namespace JsonRPC {
           if (!std::regex_match(block, numFilter)) throw std::runtime_error(
             "Invalid block number"
           );
-          uint64_t blockNum = uint64_t(Hex(block).getUint());
-          if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
-            "Only latest block is supported"
-          );
+          //uint64_t blockNum = uint64_t(Hex(block).getUint());
+          //if (blockNum != storage->latest()->getNHeight()) throw std::runtime_error(
+          //  "Only latest block is supported"
+          //);
         }
         if (!std::regex_match(address, addFilter)) throw std::runtime_error("Invalid address hex");
         return Address(Hex::toBytes(address));

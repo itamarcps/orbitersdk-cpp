@@ -21,7 +21,9 @@ class HTTPServer {
     const std::unique_ptr<Storage>& storage_;
 
     /// Reference pointer to the P2P connection manager.
+#ifndef COSMOS_COMPATIBLE
     const std::unique_ptr<P2P::ManagerNormal>& p2p_;
+#endif
 
     /// Reference pointer to the options singleton.
     const std::unique_ptr<Options>& options_;
@@ -42,6 +44,7 @@ class HTTPServer {
     std::future<bool> runFuture_;
 
   public:
+#ifndef COSMOS_COMPATIBLE
     /**
      * Constructor. Does NOT automatically start the server.
      * @param state Reference pointer to the blockchain's state.
@@ -54,6 +57,13 @@ class HTTPServer {
         const std::unique_ptr<P2P::ManagerNormal>& p2p, const std::unique_ptr<Options>& options
     ) : state_(state), storage_(storage), p2p_(p2p), options_(options), port_(options->getHttpPort())
     {}
+#else
+    HTTPServer(
+      const std::unique_ptr<State>& state, const std::unique_ptr<Storage>& storage,
+      const std::unique_ptr<Options>& options
+    ) : state_(state), storage_(storage), options_(options), port_(options->getHttpPort())
+    {}
+#endif
 
     /**
      * Destructor.

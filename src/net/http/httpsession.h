@@ -14,7 +14,9 @@ See the LICENSE.txt file in the project root for more information.
 class HTTPSession;  // HTTPQueue depends on HTTPSession and vice-versa
 class State;
 class Storage;
+#ifndef COSMOS_COMPATIBLE
 namespace P2P { class ManagerNormal; }
+#endif
 
 /// Class used for HTTP pipelining.
 class HTTPQueue {
@@ -87,7 +89,9 @@ class HTTPSession : public std::enable_shared_from_this<HTTPSession> {
     const std::unique_ptr<Storage>& storage_;
 
     /// Reference pointer to the P2P connection manager.
+#ifndef COSMOS_COMPATIBLE
     const std::unique_ptr<P2P::ManagerNormal>& p2p_;
+#endif
 
     /// Reference pointer to the options singleton.
     const std::unique_ptr<Options>& options_;
@@ -129,10 +133,16 @@ class HTTPSession : public std::enable_shared_from_this<HTTPSession> {
       tcp::socket&& sock, std::shared_ptr<const std::string>& docroot,
       const std::unique_ptr<State>& state,
       const std::unique_ptr<Storage>& storage,
+#ifndef COSMOS_COMPATIBLE
       const std::unique_ptr<P2P::ManagerNormal>& p2p,
+#endif
       const std::unique_ptr<Options>& options
     ) : stream_(std::move(sock)), docroot_(docroot), queue_(*this), state_(state),
-    storage_(storage), p2p_(p2p), options_(options)
+    storage_(storage),
+#ifndef COSMOS_COMPATIBLE
+    p2p_(p2p),
+#endif
+    options_(options)
     {}
 
     /// Start the HTTP session.

@@ -30,7 +30,9 @@ class HTTPListener : public std::enable_shared_from_this<HTTPListener> {
     const std::unique_ptr<Storage>& storage_;
 
     /// Reference pointer to the P2P connection manager.
+#ifndef COSMOS_COMPATIBLE
     const std::unique_ptr<P2P::ManagerNormal>& p2p_;
+#endif
 
     /// Reference pointer to the options singleton.
     const std::unique_ptr<Options>& options_;
@@ -60,7 +62,10 @@ class HTTPListener : public std::enable_shared_from_this<HTTPListener> {
     HTTPListener(
         net::io_context& ioc, tcp::endpoint ep, std::shared_ptr<const std::string>& docroot,
         const std::unique_ptr<State>& state, const std::unique_ptr<Storage>& storage,
-        const std::unique_ptr<P2P::ManagerNormal>& p2p, const std::unique_ptr<Options>& options
+#ifndef COSMOS_COMPATIBLE
+        const std::unique_ptr<P2P::ManagerNormal>& p2p,
+#endif
+        const std::unique_ptr<Options>& options
     );
 
     void start(); ///< Start accepting incoming connections.
