@@ -228,6 +228,20 @@ struct Account {
 };
 
 /**
+ * EVM Abstraction for an account
+ * An account holds nonce, code, codehash, balance and storage.
+ * It always holds a "original" (first) and "current" (second) values
+ * These original and current values are used in case of reversions due to contract exceptions
+ */
+struct EVMAccount {
+  std::pair<uint64_t, uint64_t> nonce;  ///< Account nonce.
+  std::pair<Bytes, Bytes> code;         ///< Account code.
+  std::pair<Hash, Hash> codeHash;       ///< Account code hash.
+  std::pair<uint256_t, uint256_t> balance;  ///< Account balance.
+  std::pair<std::unordered_map<uint256_t, uint256_t>, std::unordered_map<uint256_t, uint256_t>> storage;  ///< Account storage.
+};
+
+/**
  * Struct for abstracting a Solidity event parameter.
  * @tparam T The parameter's type.
  * @tparam Index Whether the parameter is indexed or not.
