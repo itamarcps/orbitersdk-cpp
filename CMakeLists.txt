@@ -78,6 +78,7 @@ find_package(Threads)
 find_package(Boost 1.74.0 REQUIRED COMPONENTS chrono filesystem program_options system thread nowide)
 find_package(OpenSSL 1.1.1 REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(Evmc REQUIRED)
 
 # Find system packages (custom)
 find_package(CryptoPP 8.2.0 REQUIRED)
@@ -384,12 +385,12 @@ if(BUILD_AVALANCHEGO)
 
   add_dependencies(orbitersdk_lib gen-grpc ProtoFiles)
 
-  target_include_directories(orbitersdk_lib PUBLIC ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR})
+  target_include_directories(orbitersdk_lib PUBLIC ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR} ${EVMC_INCLUDE_DIR})
 
   target_link_libraries(orbitersdk_lib PRIVATE
     ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS} ${Protobuf_LIBRARIES}
     ${GRPC_LIBRARIES} ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags
-    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES}
+    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${EVMC_LIBRARY} ${EVMONE_LIBRARY}
   )
 
   set_target_properties(orbitersdk_lib PROPERTIES COMPILE_FLAGS "-DAVALANCHEGO_COMPATIBLE=1")
