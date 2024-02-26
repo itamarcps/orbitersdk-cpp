@@ -19,7 +19,7 @@ See the LICENSE.txt file in the project root for more information.
 #include <span>
 #include <cxxabi.h>
 #include <variant>
-#include <evmc/evmc.h>
+#include <evmc/evmc.hpp>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
@@ -229,20 +229,6 @@ struct Account {
 };
 
 /**
- * EVM Abstraction for an account
- * An account holds nonce, code, codehash, balance and storage.
- * It always holds a "original" (first) and "current" (second) values
- * These original and current values are used in case of reversions due to contract exceptions
- */
-struct EVMAccount {
-  std::pair<uint64_t, uint64_t> nonce;  ///< Account nonce.
-  std::pair<Bytes, Bytes> code;         ///< Account code.
-  std::pair<Hash, Hash> codeHash;       ///< Account code hash.
-  std::pair<uint256_t, uint256_t> balance;  ///< Account balance.
-  std::pair<std::unordered_map<uint256_t, uint256_t>, std::unordered_map<uint256_t, uint256_t>> storage;  ///< Account storage.
-};
-
-/**
  * Struct for abstracting a Solidity event parameter.
  * @tparam T The parameter's type.
  * @tparam Index Whether the parameter is indexed or not.
@@ -369,10 +355,12 @@ namespace Utils {
   /**
    * Special functions to convert to evmc_uint256be types.
    */
-  uint256_t evmcUint256ToUint256(const evmc_uint256be& i);
-  evmc_uint256be uint256ToEvmcUint256(const uint256_t& i);
-  BytesArr<32> evmcUint256ToBytes(const evmc_uint256be& i);
-  evmc_uint256be bytesToEvmcUint256(const BytesArrView b);
+  uint256_t evmcUint256ToUint256(const evmc::uint256be& i);
+  evmc::uint256be uint256ToEvmcUint256(const uint256_t& i);
+  BytesArr<32> evmcUint256ToBytes(const evmc::uint256be& i);
+  evmc::uint256be bytesToEvmcUint256(const BytesArrView b);
+
+  evmc::address ecrecover(evmc::bytes32 hash, evmc::bytes32 v, evmc::bytes32 r, evmc::bytes32 s);
 
   ///@{
   /**

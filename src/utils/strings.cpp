@@ -15,15 +15,15 @@ Hash::Hash(const std::string_view sv) {
   std::copy(sv.begin(), sv.end(), this->data_.begin());
 }
 
-Hash::Hash(const evmc_bytes32* data) {
-  // Copy the data from the evmc_bytes32 struct to this->data_
-  std::copy(data->bytes, data->bytes + 32, this->data_.begin());
+Hash::Hash(const evmc::bytes32& data) {
+  // Copy the data from the evmc::bytes32 struct to this->data_
+  std::copy(data.bytes, data.bytes + 32, this->data_.begin());
 }
 
 uint256_t Hash::toUint256() const { return Utils::bytesToUint256(data_); }
 
-evmc_bytes32 Hash::toEvmcBytes32() const {
-  evmc_bytes32 bytes;
+evmc::bytes32 Hash::toEvmcBytes32() const {
+  evmc::bytes32 bytes;
   std::copy(this->data_.begin(), this->data_.end(), bytes.bytes);
   return bytes;
 }
@@ -45,13 +45,13 @@ Address::Address(const std::string_view add, bool inBytes) {
   }
 }
 
-Address::Address(const evmc_address* data) {
-  // Copy the data from the evmc_address struct to this->data_
-  std::copy(data->bytes, data->bytes + 20, this->data_.begin());
+Address::Address(const evmc::address& data) {
+  // Copy the data from the evmc::address struct to this->data_
+  std::copy(data.bytes, data.bytes + 20, this->data_.begin());
 }
 
-evmc_address Address::toEvmcAddress() const {
-  evmc_address addr;
+evmc::address Address::toEvmcAddress() const {
+  evmc::address addr;
   std::copy(this->data_.begin(), this->data_.end(), addr.bytes);
   return addr;
 }

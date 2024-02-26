@@ -13,7 +13,7 @@ See the LICENSE.txt file in the project root for more information.
 #include <span>
 #include <algorithm>
 
-#include <evmc/evmc.h>
+#include <evmc/evmc.hpp>
 #include "hex.h"
 
 // TODO: It is possible to implement **fast** operators for some types,
@@ -167,10 +167,10 @@ class Hash : public FixedBytes<32> {
     Hash(const uint256_t& data);
 
     /**
-     * Constructor using a pointer to evmc_bytes32.
-     * @param data The evmc_bytes32 pointer to convert into a hash string.
+     * Constructor using a pointer to evmc::bytes32.
+     * @param data The evmc::bytes32 pointer to convert into a hash string.
      */
-    Hash(const evmc_bytes32* data);
+    Hash(const evmc::bytes32& data);
 
     /**
      * Constructor using string_view.
@@ -179,7 +179,7 @@ class Hash : public FixedBytes<32> {
     Hash(const std::string_view sv);
 
     uint256_t toUint256() const;  ///< Convert the hash string back to an unsigned 256-bit number.
-    evmc_bytes32 toEvmcBytes32() const;  ///< Convert the hash string back to an evmc_bytes32 pointer.
+    evmc::bytes32 toEvmcBytes32() const;  ///< Convert the hash string back to an evmc::bytes32 pointer.
 
     /// Generate a random 32-byte/256-bit hash.
     inline static Hash random() { Hash h; RAND_bytes(h.data_.data(), 32); return h; }
@@ -216,10 +216,10 @@ class Address : public FixedBytes<20> {
     inline Address() { this->data_.fill(uint8_t{0x00}); };
 
     /**
-     * Constructor usinbg a pointer to evmc_address
-     * @param data The evmc_address pointer to convert into an address.
+     * Constructor usinbg a pointer to evmc::address
+     * @param data The evmc::address pointer to convert into an address.
      */
-    Address(const evmc_address* data);
+    Address(const evmc::address& data);
 
     /**
      * Copy constructor.
@@ -246,7 +246,7 @@ class Address : public FixedBytes<20> {
     /// Move constructor.
     Address(BytesArr<20>&& add) : FixedBytes<20>(std::move(add)) {}
 
-    evmc_address toEvmcAddress() const;  ///< Convert the address string back to an evmc_address.
+    evmc::address toEvmcAddress() const;  ///< Convert the address string back to an evmc::address.
 
     /**
      * Convert the address to checksum format, as per [EIP-55](https://eips.ethereum.org/EIPS/eip-55).

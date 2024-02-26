@@ -14,10 +14,14 @@
 #include "../utils/hex.h"
 #include "../utils/strings.h"
 
+#include "ecrecoverprecompile.hpp"
+
 namespace evmc
 {
 /// The string of bytes.
 using bytes = std::basic_string<uint8_t>;
+
+
 
 /// Extended value (with original value and access flag) for account storage.
 struct StorageValue
@@ -72,6 +76,7 @@ struct MockedAccount
     /// Helper method for setting balance by numeric type.
     void set_balance(uint64_t x) noexcept
     {
+        std::cout << "SET_BALANCE CALLED!!!" << std::endl;
         balance = uint256be{};
         for (std::size_t i = 0; i < sizeof(x); ++i)
             balance.bytes[sizeof(balance) - 1 - i] = static_cast<uint8_t>(x >> (8 * i));
@@ -82,6 +87,8 @@ struct MockedAccount
 class MockedHost : public Host
 {
 public:
+
+    std::vector<std::array<uint8_t, 32>> m_ecrecover_results;
 
     MockedHost(evmc_vm* vm) : vm_(vm) {}
     /// LOG record.
@@ -424,14 +431,27 @@ public:
                 call_msg.input_data = input_copy.data();
             }
         }
+
+        if (msg.recipient == ECRECOVER_ADDRESS) {
+            return Precompile::ecrecover(msg, m_ecrecover_results);
+        }
+
         Result result (evmc_execute(vm_, &this->get_interface(), (evmc_host_context*)this,
                  evmc_revision::EVMC_LATEST_STABLE_REVISION, &msg,
                  accounts[msg.recipient].code.data(), accounts[msg.recipient].code.size()));
+        Bytes outputData;
+        std::copy(result.output_data, result.output_data + result.output_size, std::back_inserter(outputData));
+        std::cout << "RETURN OF THE CALL: " << result.status_code << std::endl;
+        std::cout << "RETURN OF THE CALL output.size: " << result.output_size << std::endl;
+        std::cout << "RETURN OF THE CALL output: " << Hex::fromBytes(outputData) << std::endl;
         return result;
     }
 
     /// Get transaction context (EVMC host method).
-    evmc_tx_context get_tx_context() const noexcept override { return tx_context; }
+    evmc_tx_context get_tx_context() const noexcept override {
+        std::cout << "GET_TX_CONTEXT IS CALLED!!!" << std::endl;
+        return tx_context;
+    }
 
     /// Get the block header hash (EVMC host method).
     bytes32 get_block_hash(int64_t block_number) const noexcept override
