@@ -56,6 +56,10 @@ evmc::address Address::toEvmcAddress() const {
   return addr;
 }
 
+Address::Address(const evmc_address &data) {
+  // Same as evmc::address
+  std::copy(data.bytes, data.bytes + 20, this->data_.begin());
+}
 
 Hex Address::toChksum() const {
   // Hash requires lowercase address without "0x"

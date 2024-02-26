@@ -444,6 +444,9 @@ namespace Utils {
   uint8_t bytesToUint8(const BytesArrView b);
   int256_t bytesToInt256(const BytesArrView b);
 
+
+  Bytes cArrayToBytes(const uint8_t* arr, size_t size);
+
   /**
    * Add padding to the left of a byte vector.
    * @param bytes The vector to pad.

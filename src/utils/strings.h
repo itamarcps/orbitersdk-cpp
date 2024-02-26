@@ -77,8 +77,11 @@ template <unsigned N> class FixedBytes {
     /// Getter for `data_`, non-const version.
     inline BytesArr<N>& get_non_const() const { return this->data_; }
 
-    /// Getter for `data_`, but returns it as a C-style string.
+    /// Getter for `data_`, but returns it as a const C-style string.
     inline const Byte* raw() const { return this->data_.data(); }
+
+    /// Getter for `data_`, but returns it as a non-const C-style string.
+    inline Byte* raw_non_const() { return this->data_.data(); }
 
     /**
      * Getter for `data_`, but returns it as a hex string.
@@ -167,7 +170,7 @@ class Hash : public FixedBytes<32> {
     Hash(const uint256_t& data);
 
     /**
-     * Constructor using a pointer to evmc::bytes32.
+     * Constructor using a reference to evmc::bytes32.
      * @param data The evmc::bytes32 pointer to convert into a hash string.
      */
     Hash(const evmc::bytes32& data);
@@ -216,10 +219,16 @@ class Address : public FixedBytes<20> {
     inline Address() { this->data_.fill(uint8_t{0x00}); };
 
     /**
-     * Constructor usinbg a pointer to evmc::address
+     * Constructor using a reference to evmc::address
      * @param data The evmc::address pointer to convert into an address.
      */
     Address(const evmc::address& data);
+
+    /**
+     * Constructor using a reference to evmc_address
+     * @param data The evmc_address pointer to convert into an address.
+     */
+    Address(const evmc_address& data);
 
     /**
      * Copy constructor.

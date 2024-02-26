@@ -63,6 +63,13 @@ evmc::uint256be Utils::bytesToEvmcUint256(const BytesArrView b) {
   return ret;
 }
 
+Bytes Utils::cArrayToBytes(const uint8_t* arr, size_t size) {
+  Bytes ret;
+  ret.reserve(size);
+  for (size_t i = 0; i < size; i++) ret.push_back(arr[i]);
+  return ret;
+}
+
 BytesArr<31> Utils::uint248ToBytes(const uint248_t &i) {
   BytesArr<31> ret;
   Bytes tmp;
