@@ -86,7 +86,7 @@ namespace JsonRPC::Encoding {
   json net_version(const Options& options) {
     json ret;
     ret["jsonrpc"] = 2.0;
-    ret["result"] = std::to_string(options.getVersion());
+    ret["result"] = Hex::fromBytes(Utils::uintToBytes(options.getChainID()), true).forRPC();
     return ret;
   }
 
@@ -241,14 +241,15 @@ namespace JsonRPC::Encoding {
     return ret;
   }
 
-  json eth_getCode(const Address&) {
+  json eth_getCode(const Address& address, const State& state) {
     json ret;
     ret["jsonrpc"] = "2.0";
-    ret["result"] = "0x";
+    ret["result"] = Hex::fromBytes(state.getContractCode(address), true).forRPC();
     return ret;
   }
 
   json eth_sendRawTransaction(const TxBlock& tx, State& state, P2P::ManagerNormal& p2p) {
+    Utils::safePrint("eth_sendRawTransaction: " + Hex::fromBytes(tx.rlpSerialize()).get());
     json ret;
     ret["jsonrpc"] = "2.0";
     const auto& txHash = tx.hash();
@@ -393,7 +394,11 @@ namespace JsonRPC::Encoding {
       ret["result"]["effectiveGasUsed"] = Hex::fromBytes(Utils::uintToBytes(tx->getGasLimit()), true).forRPC();
       ret["result"]["effectiveGasPrice"] = Hex::fromBytes(Utils::uintToBytes(tx->getMaxFeePerGas()),true).forRPC();
       ret["result"]["gasUsed"] = Hex::fromBytes(Utils::uintToBytes(tx->getGasLimit()), true).forRPC();
-      ret["result"]["contractAddress"] = json::value_t::null; // TODO: CHANGE THIS WHEN CREATING CONTRACTS!
+      if (state.getEvmContractAddress(tx->hash())) {
+        ret["result"]["contractAddress"] = state.getEvmContractAddress(tx->hash()).hex(true);
+      } else {
+        ret["result"]["contractAddress"] = json::value_t::null;
+      }
       ret["result"]["logs"] = json::array();
       ret["result"]["logsBloom"] = Hash().hex(true);
       ret["result"]["type"] = "0x00";

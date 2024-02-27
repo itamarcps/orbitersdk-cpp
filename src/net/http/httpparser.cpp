@@ -29,6 +29,7 @@ std::string parseJsonRpcRequest(
     auto RequestMethod = JsonRPC::Decoding::getMethod(request);
     switch (RequestMethod) {
       case JsonRPC::Methods::invalid:
+        Utils::safePrint("INVALID METHOD: " + request["method"].get<std::string>());
         ret["error"]["code"] = -32601;
         ret["error"]["message"] = "Method not found";
         break;
@@ -96,10 +97,12 @@ std::string parseJsonRpcRequest(
           JsonRPC::Decoding::eth_call(request, storage), state
         );
         break;
-      case JsonRPC::Methods::eth_estimateGas:
+      case JsonRPC::Methods::eth_estimateGas: {
+        Utils::safePrint("Estimating gas...");
         ret = JsonRPC::Encoding::eth_estimateGas(
           JsonRPC::Decoding::eth_estimateGas(request, storage), state
         );
+      }
         break;
       case JsonRPC::Methods::eth_gasPrice:
         JsonRPC::Decoding::eth_gasPrice(request);
@@ -122,14 +125,16 @@ std::string parseJsonRpcRequest(
         break;
       case JsonRPC::Methods::eth_getCode:
         ret = JsonRPC::Encoding::eth_getCode(
-          JsonRPC::Decoding::eth_getCode(request, storage)
+          JsonRPC::Decoding::eth_getCode(request, storage), state
         );
         break;
-      case JsonRPC::Methods::eth_sendRawTransaction:
+      case JsonRPC::Methods::eth_sendRawTransaction: {
+        Utils::safePrint("Sending raw transaction...");
         ret = JsonRPC::Encoding::eth_sendRawTransaction(
           JsonRPC::Decoding::eth_sendRawTransaction(request, options.getChainID()),
           state, p2p
         );
+      }
         break;
       case JsonRPC::Methods::eth_getTransactionByHash:
         ret = JsonRPC::Encoding::eth_getTransactionByHash(

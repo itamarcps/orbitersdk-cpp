@@ -58,7 +58,7 @@ public:
   mutable bool shouldRevert = false;                               // Used to know if we should revert or commit in the case of a exception inside any of the calls below
 
   evmc_result createContract(const ethCallInfo& tx) {
-    const auto& [from, to, gasLimit, gasPrice, value, functor, data] = tx;
+    const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
     const auto contractAddress = deriveContractAddress(this->accounts[from].nonce.second, from);
     evmc_message creationMsg;
     creationMsg.kind = evmc_call_kind::EVMC_CREATE;
@@ -70,13 +70,14 @@ public:
     creationMsg.value = Utils::uint256ToEvmcUint256(value);
     creationMsg.create2_salt = {};
     creationMsg.code_address = {};
+    creationMsg.flags = 0;
 
     auto creationResult = evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &creationMsg,
-               data.data(), data.size());
+               fullData.data(), fullData.size());
 
     if (creationResult.status_code) {
-      std::cout << "Bad news! Contract creation failed" << std::endl;
+      std::cout << "Bad news! Contract creation failed, reason: " << evmc_status_code_to_string(creationResult.status_code) << std::endl;
       return creationResult;
     }
     // Store contract code into the account
@@ -84,6 +85,7 @@ public:
     this->accounts[contractAddress].codeHash.second = Utils::sha3(code);
     this->accounts[contractAddress].code.second = code;
     // Stored used to revert in case of exception
+    std::cout << "Hash: " << this->currentTxHash.hex(true) << " created contract at: " << contractAddress.hex(true) << std::endl;
     this->recentlyCreatedContracts.push_back(currentTxHash);
     this->contractAddresses[currentTxHash] = contractAddress;
     this->accessedAccountsCode.push_back(contractAddress);
@@ -92,19 +94,19 @@ public:
   }
 
   evmc_result execute(const ethCallInfo& tx) {
-    const auto& [from, to, gasLimit, gasPrice, value, functor, data] = tx;
+    const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
 
     if (to == Address()) {
       return this->createContract(tx);
     }
-
     evmc_message msg;
     msg.kind = evmc_call_kind::EVMC_CALL;
-    msg.gas = static_cast<uint64_t>(gasLimit);
+    msg.flags = 0;
+    msg.gas = static_cast<int64_t>(gasLimit);
     msg.recipient = to.toEvmcAddress();
     msg.sender = from.toEvmcAddress();
-    msg.input_data = data.data();
-    msg.input_size = data.size();
+    msg.input_data = fullData.data();
+    msg.input_size = fullData.size();
     msg.value = Utils::uint256ToEvmcUint256(value);
     msg.create2_salt = {};
     msg.code_address = to.toEvmcAddress();
@@ -149,7 +151,7 @@ public:
                     const uint64_t& blockGasLimit,
                     const uint256_t& chainId) {
 
-      const auto [from, to, gasLimit, gasPrice, value, functor, data] = tx;
+      const auto [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
       this->currentTxContext.tx_gas_price = Utils::uint256ToEvmcUint256(gasPrice);
       this->currentTxContext.tx_origin = from.toEvmcAddress();
       this->currentTxContext.block_coinbase = blockCoinbase.toEvmcAddress();
@@ -311,6 +313,7 @@ public:
     }
 
     evmc_tx_context get_tx_context() const noexcept override {
+      std::cout << "Getting tx context" << std::endl;
       return this->currentTxContext;
     }
 

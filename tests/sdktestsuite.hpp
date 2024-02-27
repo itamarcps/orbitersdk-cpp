@@ -252,6 +252,10 @@ class SDKTestSuite {
       return this->storage_.latest();
     }
 
+    uint256_t estimateGas(const TxBlock& tx) {
+      return this->state_.estimateGas(tx.txToCallInfo());
+    }
+
     /**
      * Create a new TxBlock object based on the provided account and given the current state (for nonce).
      * @param TestAccount from Account to send from. (the private key to sign the transaction will be taken from here)
@@ -263,9 +267,9 @@ class SDKTestSuite {
     TxBlock createNewTx(
       const TestAccount& from, const Address& to, const uint256_t& value, Bytes data = Bytes()
     ) {
-      // 1000000000 = 1 GWEI, 21000 = 21000 WEI
+      // 1000000000 = 1 GWEI, 210000 = 210000 WEI
       return TxBlock(to, from.address, data, this->options_.getChainID(),
-        this->state_.getNativeNonce(from.address), value, 1000000000, 1000000000, 21000, from.privKey
+        this->state_.getNativeNonce(from.address), value, 1000000000, 1000000000, 210000, from.privKey
       );
     }
 
@@ -659,10 +663,12 @@ class SDKTestSuite {
       const Address& contractAddress, ReturnType(TContract::*func)() const
     ) {
       ethCallInfoAllocated callData;
-      auto& [fromInfo, toInfo, gasInfo, gasPriceInfo, valueInfo, functorInfo, dataInfo] = callData;
+      auto& [fromInfo, toInfo, gasInfo, gasPriceInfo, valueInfo, functorInfo, dataInfo, fullData] = callData;
       toInfo = contractAddress;
       functorInfo = ABI::FunctorEncoder::encode<>(ContractReflectionInterface::getFunctionName(func));
-      dataInfo = Bytes();
+      dataInfo = {};
+      gasInfo = 10000000;
+      Utils::appendBytes(fullData, functorInfo);
       return std::get<0>(ABI::Decoder::decodeData<ReturnType>(this->state_.ethCall(callData)));
     }
 
@@ -684,10 +690,13 @@ class SDKTestSuite {
     ) {
       TContract::registerContract();
       ethCallInfoAllocated callData;
-      auto& [fromInfo, toInfo, gasInfo, gasPriceInfo, valueInfo, functorInfo, dataInfo] = callData;
+      auto& [fromInfo, toInfo, gasInfo, gasPriceInfo, valueInfo, functorInfo, dataInfo, fullData] = callData;
       toInfo = contractAddress;
       functorInfo = ABI::FunctorEncoder::encode<Args...>(ContractReflectionInterface::getFunctionName(func));
-      dataInfo = ABI::Encoder::encodeData<Args...>(std::forward<decltype(args)>(args)...);
+      Utils::appendBytes(fullData, functorInfo);
+      Utils::appendBytes(fullData, ABI::Encoder::encodeData<Args...>(std::forward<decltype(args)>(args)...));
+      dataInfo = BytesArrView(fullData.begin() + 4, fullData.end());
+      gasInfo = 10000000;
       return std::get<0>(ABI::Decoder::decodeData<ReturnType>(this->state_.ethCall(callData)));
     }
 
@@ -1002,6 +1011,19 @@ class SDKTestSuite {
 
     /// Stop the P2P and HTTP servers.
     void stopServices() { this->http_.stop(); this->p2p_.stop(); }
+
+    /// Getter for EVM contracts
+    std::vector<Address> getEvmContracts() { return this->state_.getEvmContracts(); }
+
+    bool isEvmContract(const Address& addr) const {
+      return this->state_.isEvmContract(addr);
+    }
+
+    /// Get the evm contract address deployed for a given address (if any).
+    /// Returns Address() if no contract is found.
+    Address getEvmContractAddress(const Hash& txHash) const {
+      return this->state_.getEvmContractAddress(txHash);
+    }
 };
 
 #endif // SDKTESTSUITE_H

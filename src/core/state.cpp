@@ -146,26 +146,37 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
     // EVM Call! Set the tx context and then call the contract.
     // First, try transfering the balance!
     this->evmHost_.accessedAccountsBalances.emplace_back(tx.getFrom());
+    Address realTo = (tx.getTo() == Address()) ? this->evmHost_.deriveContractAddress(tx.getNonce(), tx.getFrom()) : tx.getTo();
     if (tx.getValue()) {
-      toBalance += tx.getValue();
+      this->evmHost_.accounts[realTo].balance.second += tx.getValue();
       balance -= tx.getValue();
       this->evmHost_.accessedAccountsBalances.emplace_back(tx.getTo());
     }
     // Then set context
-    this->evmHost_.setTxContext(tx.txToCallInfo(), blockHash, blockHeight, blockCoinbase, blockTimestamp, blockGasLimit, chainId);
-    this->evmHost_.currentTxHash = tx.hash();
-    auto evmCallResult = this->evmHost_.execute(tx.txToCallInfo());
-    uint256_t gasUsed = tx.getGasLimit() - (evmCallResult.gas_left + 21000);
-    toBalance += gasUsed * tx.getMaxFeePerGas();
-
-    if (evmCallResult.status_code || this->evmHost_.shouldRevert) {
+    try {
+      this->evmHost_.setTxContext(tx.txToCallInfo(), blockHash, blockHeight, blockCoinbase, blockTimestamp, blockGasLimit, chainId);
+      this->evmHost_.currentTxHash = tx.hash();
+      auto evmCallResult = this->evmHost_.execute(tx.txToCallInfo());
+      int64_t gasLeft = evmCallResult.gas_left;
+      gasLeft - 21000;
+      if (gasLeft < 0) {
+        throw DynamicException("Error when executing EVM contract, gas limit is lower than gas left");
+      }
+      uint256_t gasUsed = tx.getGasLimit() - uint256_t(gasLeft);
+      balance -= gasUsed * tx.getMaxFeePerGas();
+      if (evmCallResult.status_code || this->evmHost_.shouldRevert) {
+        throw DynamicException("Error when executing EVM contract, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+      }
+      this->evmHost_.commit();
+      this->evmHost_.commitCode();
+    } catch (const std::exception& e) {
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__,
+        "Transaction: " + tx.hash().hex().get() + " failed to process, reason: " + e.what()
+      );
       this->evmHost_.shouldRevert = false;
       // Tx went badly, revert the changes.
       balance += tx.getValue();
-      toBalance -= tx.getValue();
-      Logger::logToDebug(LogType::ERROR, Log::state, __func__,
-        "Transaction: " + tx.hash().hex().get() + " failed to process, reason: " + std::to_string(evmCallResult.status_code)
-      );
+      this->evmHost_.accounts[realTo].balance.second -= tx.getValue();
       this->evmHost_.revert();
       this->evmHost_.revertCode();
     }
@@ -199,6 +210,7 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
     }
   }
   nonce++;
+  this->evmHost_.accessedAccountsNonces.emplace_back(tx.getFrom());
   this->evmHost_.commitNonce();
   this->evmHost_.commitBalance();
 }
@@ -395,18 +407,21 @@ void State::addBalance(const Address& addr) {
 }
 
 Bytes State::ethCall(const ethCallInfo& callInfo) const {
-  const auto& [from, to, gasLimit, gasPrice, value, functor, data] = callInfo;
+  const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = callInfo;
 
   std::shared_lock lock(this->stateMutex_);
   auto &address = std::get<1>(callInfo);
   if (this->contractManager_.isContractAddress(address)) {
     return this->contractManager_.callContract(callInfo);
   } else {
-    if (this->evmHost_.isEvmContract(to)) {
+    if (this->evmHost_.isEvmContract(to) || to == Address()) {
       Utils::safePrint("Estimating gas from evm...");
       if (value) {
+        auto realTo = (to == Address()) ? this->evmHost_.deriveContractAddress(this->getNativeNonce(from), from) : to;
         this->evmHost_.accounts[from].balance.second -= value;
-        this->evmHost_.accounts[to].balance.second += value;
+        this->evmHost_.accounts[realTo].balance.second += value;
+        this->evmHost_.accessedAccountsBalances.push_back(from);
+        this->evmHost_.accessedAccountsBalances.push_back(realTo);
       }
       auto latestBlock = this->storage_.latest();
       this->evmHost_.setTxContext(callInfo,
@@ -435,7 +450,7 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
 uint256_t State::estimateGas(const ethCallInfo& callInfo) {
   std::shared_lock lock(this->stateMutex_);
   uint64_t baseGas = 21000;
-  const auto& [from, to, gasLimit, gasPrice, value, functor, data] = callInfo;
+  const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = callInfo;
 
   // Check balance/gasLimit/gasPrice if available.
   if (from && value) {
@@ -453,11 +468,14 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
     this->contractManager_.validateCallContractWithTx(callInfo);
   }
 
-  if (this->evmHost_.isEvmContract(to)) {
-    Utils::safePrint("Estimating gas from evm...");
+  if (this->evmHost_.isEvmContract(to) || to == Address()) {
+    Utils::safePrint("Estimating gas from evm..." + gasLimit.str());
     if (value) {
+      Address realTo = (to == Address()) ? this->evmHost_.deriveContractAddress(this->getNativeNonce(from), from) : to;
       this->evmHost_.accounts[from].balance.second -= value;
-      this->evmHost_.accounts[to].balance.second += value;
+      this->evmHost_.accounts[realTo].balance.second += value;
+      this->evmHost_.accessedAccountsBalances.push_back(from);
+      this->evmHost_.accessedAccountsBalances.push_back(realTo);
     }
     auto latestBlock = this->storage_.latest();
     this->evmHost_.setTxContext(callInfo,
@@ -467,7 +485,13 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
       latestBlock->getTimestamp(),
       100000000,
       this->options_.getChainID());
-      auto evmCallResult = this->evmHost_.execute(callInfo);
+    auto evmCallResult = this->evmHost_.execute(callInfo);
+
+    int64_t gasLeft = evmCallResult.gas_left;
+    gasLeft - 21000;
+    if (gasLeft < 0) {
+      throw DynamicException("Error when estimating gas, gasLimit is lower than gas left");
+    }
 
     // Revert EVERYTHING from the call.
     this->evmHost_.revert();
@@ -497,6 +521,30 @@ void State::processContractPayable(const std::unordered_map<Address, uint256_t, 
 std::vector<std::pair<std::string, Address>> State::getContracts() const {
   std::shared_lock lock(this->stateMutex_);
   return this->contractManager_.getContracts();
+}
+
+std::vector<Address> State::getEvmContracts() const {
+  std::shared_lock lock(this->stateMutex_);
+  std::vector<Address> evmContracts;
+  for (const auto& [txHash, addr] : this->evmHost_.contractAddresses) {
+    evmContracts.push_back(addr);
+  }
+  return evmContracts;
+}
+
+bool State::isEvmContract(const Address& addr) const {
+  std::shared_lock lock(this->stateMutex_);
+  return this->evmHost_.isEvmContract(addr);
+}
+
+Bytes State::getContractCode(const Address& addr) const {
+  std::shared_lock lock(this->stateMutex_);
+  return this->evmHost_.accounts[addr].code.second;
+}
+
+Address State::getEvmContractAddress(const Hash& txHash) const {
+  std::shared_lock lock(this->stateMutex_);
+  return this->evmHost_.contractAddresses[txHash];
 }
 
 std::vector<Event> State::getEvents(

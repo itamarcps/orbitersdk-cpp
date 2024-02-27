@@ -150,7 +150,7 @@ template<class Body, class Allocator, class Send> void handle_request(
     res.keep_alive(req.keep_alive());
     return send(std::move(res));
   }
-
+  Utils::safePrint("HTTP Request: " + req.body());
   std::string request = req.body();
   std::string answer = parseJsonRpcRequest(
     request, state, storage, p2p, options

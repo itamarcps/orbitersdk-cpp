@@ -232,6 +232,19 @@ class State {
     /// Get a list of contract addresses and names.
     std::vector<std::pair<std::string, Address>> getContracts() const;
 
+    /// Get a list of EVM contracts.
+    std::vector<Address> getEvmContracts() const;
+
+    /// Check if it is an EVM contract.
+    bool isEvmContract(const Address& addr) const;
+
+    /// Getter for contract code
+    Bytes getContractCode(const Address& addr) const;
+
+    /// Get the evm contract address deployed for a given address (if any).
+    /// Returns Address() if no contract is found.
+    Address getEvmContractAddress(const Hash& txHash) const;
+
     /**
      * Get all the events emitted under the given inputs.
      * Parameters are defined when calling "eth_getLogs" on an HTTP request

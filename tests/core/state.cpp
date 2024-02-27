@@ -105,7 +105,7 @@ namespace TState {
 
       REQUIRE(latestBlock->hash() == blockchainWrapper.storage.latest()->hash());
     }
-    
+
     SECTION("Test Block with Transactions on State") {
       std::unordered_map<PrivKey, std::pair<uint256_t, uint64_t>, SafeHash> randomAccounts;
       for (uint64_t i = 0; i < 500; ++i) {

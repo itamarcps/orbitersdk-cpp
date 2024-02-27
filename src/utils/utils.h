@@ -181,18 +181,18 @@ using SafeInt256_t = SafeInt_t<256>;
 ///@}
 
 /**
- * ethCallInfo: tuple of (from, to, gasLimit, gasPrice, value, functor, data).
+ * ethCallInfo: tuple of (from, to, gasLimit, gasPrice, value, functor, data, fullData).
  * **NOTE**: Be aware that we are using BytesArrView, so you MUST be sure that
  * the data allocated in BytesArrView is valid during the whole life of the tuple.
  * If you need ethCallInfo to own the data, use ethCallInfoAllocated instead.
  */
-using ethCallInfo = std::tuple<Address,Address,uint256_t, uint256_t, uint256_t, Functor, BytesArrView>;
+using ethCallInfo = std::tuple<Address,Address,uint256_t, uint256_t, uint256_t, Functor, BytesArrView, BytesArrView>;
 
 /**
  * Same as ethCallInfo, but using Bytes instead of BytesArrView, truly
  * allocating and owning the data. Some places need it such as tests.
  */
-using ethCallInfoAllocated = std::tuple<Address,Address,uint256_t, uint256_t, uint256_t, Functor, Bytes>;
+using ethCallInfoAllocated = std::tuple<Address,Address,uint256_t, uint256_t, uint256_t, Functor, BytesArrView, Bytes>;
 
 /**
 * Fail a function with a given message.

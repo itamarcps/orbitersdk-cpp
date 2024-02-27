@@ -119,12 +119,17 @@ TxBlock::TxBlock(const BytesArrView bytes, const uint64_t&) {
 
   // Get receiver addess (to) - small string.
   // We don't actually need to get the size, because to/from has a size of 20
-  if (txData[index] != 0x94) throw DynamicException(
+  uint8_t toLength = txData[index] - 0x80;
+  if (toLength != 20 && toLength != 0) throw DynamicException(
     "Receiver address (to) is not a 20 byte string (address)"
   );
   index++; // Index at rlp[5] payload
-  this->to_ = Address(txData.subspan(index, 20));
-  index += 20; // Index at rlp[6] size
+  if (toLength == 0) {
+    this->to_ = Address();
+  } else {
+    this->to_ = Address(txData.subspan(index, 20));
+    index += 20; // Index at rlp[6] size
+  }
 
   // Get value - small string or byte itself.
   uint8_t valueLength = txData[index] >= 0x80 ? txData[index] - 0x80 : 0;
@@ -250,7 +255,7 @@ Bytes TxBlock::rlpSerialize(bool includeSig) const {
   total_size += (this->maxPriorityFeePerGas_ < 0x80) ? 1 : 1 + reqBytesMaxPriorityFeePerGas;
   total_size += (this->maxFeePerGas_ < 0x80) ? 1 : 1 + reqBytesMaxFeePerGas;
   total_size += (this->gasLimit_ < 0x80) ? 1 : 1 + reqBytesGasLimit;
-  total_size += 1 + 20; // To
+  total_size += 1 + (this->to_ == Address()) ? 1 : 20;
   total_size += (this->value_ < 0x80) ? 1 : 1 + reqBytesValue;
   total_size += 1; // Access List
 
@@ -329,8 +334,12 @@ Bytes TxBlock::rlpSerialize(bool includeSig) const {
   }
 
   // To
-  ret.insert(ret.end(), 0x94);
-  Utils::appendBytes(ret, this->to_.get());
+  if (this->to_ == Address()) {
+    ret.insert(ret.end(), 0x80);
+  } else {
+    ret.insert(ret.end(), 0x94);
+    Utils::appendBytes(ret, this->to_.get());
+  }
 
   // Value
   if (this->value_ == 0) {
@@ -383,12 +392,13 @@ Bytes TxBlock::rlpSerialize(bool includeSig) const {
 ethCallInfo TxBlock::txToCallInfo() const {
   // ethCallInfo: tuple of (from, to, gasLimit, gasPrice, value, data)
   ethCallInfo ret;
-  auto& [from, to, gasLimit, gasPrice, value, functor, data] = ret;
+  auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = ret;
   from = this->getFrom();
   to = this->getTo();
   gasLimit = this->getGasLimit();
   gasPrice = this->getMaxFeePerGas();
   value = this->getValue();
+  fullData = this->data_;
   if (this->data_.size() >= 4) {
     functor = Utils::create_view_span(this->data_).subspan(0, 4);
   }
