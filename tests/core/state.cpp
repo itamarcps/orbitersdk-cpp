@@ -105,8 +105,7 @@ namespace TState {
 
       REQUIRE(latestBlock->hash() == blockchainWrapper.storage.latest()->hash());
     }
-  }
-  TEST_CASE("Another State Class", "[core][state][onetx]") {
+    
     SECTION("Test Block with Transactions on State") {
       std::unordered_map<PrivKey, std::pair<uint256_t, uint64_t>, SafeHash> randomAccounts;
       for (uint64_t i = 0; i < 500; ++i) {
@@ -158,8 +157,6 @@ namespace TState {
         REQUIRE(blockchainWrapper.state.getNativeBalance(targetOfTransactions) == targetExpectedValue);
       }
     }
-  }
-    TEST_CASE("Continue State Class", "[core][state]") {
 
     SECTION("Test State mempool") {
       std::unordered_map<PrivKey, std::pair<uint256_t, uint64_t>, SafeHash> randomAccounts;

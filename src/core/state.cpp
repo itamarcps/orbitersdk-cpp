@@ -402,34 +402,33 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
   if (this->contractManager_.isContractAddress(address)) {
     return this->contractManager_.callContract(callInfo);
   } else {
+    if (this->evmHost_.isEvmContract(to)) {
+      Utils::safePrint("Estimating gas from evm...");
+      if (value) {
+        this->evmHost_.accounts[from].balance.second -= value;
+        this->evmHost_.accounts[to].balance.second += value;
+      }
+      auto latestBlock = this->storage_.latest();
+      this->evmHost_.setTxContext(callInfo,
+        latestBlock->hash(),
+        latestBlock->getNHeight(),
+        Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
+        latestBlock->getTimestamp(),
+        100000000,
+        this->options_.getChainID());
+      auto evmCallResult = this->evmHost_.execute(callInfo);
+
+      // Revert EVERYTHING from the call.
+      this->evmHost_.revert();
+      this->evmHost_.revertCode();
+      this->evmHost_.revertBalance();
+
+      if (evmCallResult.status_code) {
+        throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+      }
+      return Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size);
+    }
     return {};
-  }
-
-  if (this->evmHost_.isEvmContract(to)) {
-    Utils::safePrint("Estimating gas from evm...");
-    if (value) {
-      this->evmHost_.accounts[from].balance.second -= value;
-      this->evmHost_.accounts[to].balance.second += value;
-    }
-    auto latestBlock = this->storage_.latest();
-    this->evmHost_.setTxContext(callInfo,
-      latestBlock->hash(),
-      latestBlock->getNHeight(),
-      Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
-      latestBlock->getTimestamp(),
-      100000000,
-      this->options_.getChainID());
-    auto evmCallResult = this->evmHost_.execute(callInfo);
-
-    // Revert EVERYTHING from the call.
-    this->evmHost_.revert();
-    this->evmHost_.revertCode();
-    this->evmHost_.revertBalance();
-
-    if (evmCallResult.status_code) {
-      throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
-    }
-    return Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size);
   }
 }
 
