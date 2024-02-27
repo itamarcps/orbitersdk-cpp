@@ -13,8 +13,9 @@ See the LICENSE.txt file in the project root for more information.
 #include "../utils/strings.h"
 #include "../utils/hex.h"
 #include "../utils/safehash.h"
+#include "storage.h"
 
-#include "ecrecoverprecompile.hpp"
+#include "ecrecoverprecompile.h"
 /**
  * EVM Abstraction for an account
  * An account holds nonce, code, codehash, balance and storage.
@@ -38,17 +39,129 @@ struct EVMAccount {
  */
 
 class EVMHost : public evmc::Host {
-  public:
-    EVMHost(evmc_vm* vm) : vm{vm} {}
-    evmc_vm* vm;
+public:
+  EVMHost(evmc_vm* vm, const Storage* storage) : vm{vm}, storage(storage) {}
+  evmc_vm* vm;
+  const Storage* storage; // Pointer to the storage object
 
-    std::unordered_map<Address, EVMAccount, SafeHash> accounts;
-    std::vector<Address> accessedAccounts;                   // Used to know what accounts were accessed to commit or revert
-    std::vector<std::pair<Address, Hash>> accessedStorages;  // Used to know what storages were accessed to commit or reverts
-    std::vector<Address> accessedTransients;                 // Used to know what transient storages were accessed to clear
-    evmc_tx_context currentTxContext = {};                   // Current transaction context
-    std::vector<std::array<uint8_t, 32>> m_ecrecover_results; // Used to store the results of ecrecover precompile (so we don't have a memory leak)
-    mutable bool shouldRevert = false;                               // Used to know if we should revert or commit in the case of a exception inside any of the calls below
+  std::unordered_map<Address, EVMAccount, SafeHash> accounts;
+  std::vector<Address> accessedAccountsBalances;           // Used to know what accounts were accessed to commit or reverts
+  std::vector<Address> accessedAccountsCode;                   // Used to know what accounts were accessed to commit or reverts
+  std::vector<Address> accessedAccountsNonces;                   // Used to know what accounts were accessed to commit or reverts
+  std::vector<std::pair<Address, Hash>> accessedStorages;  // Used to know what storages were accessed to commit or reverts
+  std::unordered_map<Hash, Address, SafeHash> contractAddresses; // Used to know what contract addresses were created based on tx Hash
+  std::vector<Hash> recentlyCreatedContracts;              // Used to know what contracts were created to clear
+  std::vector<Address> accessedTransients;                 // Used to know what transient storages were accessed to clear
+  evmc_tx_context currentTxContext = {};                   // Current transaction context
+  Hash currentTxHash;                                      // Current transaction hash
+  std::vector<std::array<uint8_t, 32>> m_ecrecover_results; // Used to store the results of ecrecover precompile (so we don't have a memory leak)
+  mutable bool shouldRevert = false;                               // Used to know if we should revert or commit in the case of a exception inside any of the calls below
+
+  evmc_result createContract(const ethCallInfo& tx) {
+    const auto& [from, to, gasLimit, gasPrice, value, functor, data] = tx;
+    const auto contractAddress = deriveContractAddress(this->accounts[from].nonce.second, from);
+    evmc_message creationMsg;
+    creationMsg.kind = evmc_call_kind::EVMC_CREATE;
+    creationMsg.gas = static_cast<uint64_t>(gasLimit);
+    creationMsg.recipient = contractAddress.toEvmcAddress();
+    creationMsg.sender = from.toEvmcAddress();
+    creationMsg.input_data = nullptr;
+    creationMsg.input_size = 0;
+    creationMsg.value = Utils::uint256ToEvmcUint256(value);
+    creationMsg.create2_salt = {};
+    creationMsg.code_address = {};
+
+    auto creationResult = evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+               evmc_revision::EVMC_LATEST_STABLE_REVISION, &creationMsg,
+               data.data(), data.size());
+
+    if (creationResult.status_code) {
+      std::cout << "Bad news! Contract creation failed" << std::endl;
+      return creationResult;
+    }
+    // Store contract code into the account
+    Bytes code = Utils::cArrayToBytes(creationResult.output_data, creationResult.output_size);
+    this->accounts[contractAddress].codeHash.second = Utils::sha3(code);
+    this->accounts[contractAddress].code.second = code;
+    // Stored used to revert in case of exception
+    this->recentlyCreatedContracts.push_back(currentTxHash);
+    this->contractAddresses[currentTxHash] = contractAddress;
+    this->accessedAccountsCode.push_back(contractAddress);
+
+    return creationResult;
+  }
+
+  evmc_result execute(const ethCallInfo& tx) {
+    const auto& [from, to, gasLimit, gasPrice, value, functor, data] = tx;
+
+    if (to == Address()) {
+      return this->createContract(tx);
+    }
+
+    evmc_message msg;
+    msg.kind = evmc_call_kind::EVMC_CALL;
+    msg.gas = static_cast<uint64_t>(gasLimit);
+    msg.recipient = to.toEvmcAddress();
+    msg.sender = from.toEvmcAddress();
+    msg.input_data = data.data();
+    msg.input_size = data.size();
+    msg.value = Utils::uint256ToEvmcUint256(value);
+    msg.create2_salt = {};
+    msg.code_address = to.toEvmcAddress();
+
+
+    return evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+               evmc_revision::EVMC_LATEST_STABLE_REVISION, &msg,
+                accounts[to].code.second.data(), accounts[to].code.second.size());
+  }
+
+
+  static Address deriveContractAddress(const uint256_t& nonce, const Address& address) {
+    // Contract address is last 20 bytes of sha3 ( rlp ( tx from address + tx nonce ) )
+    uint8_t rlpSize = 0xc0;
+    rlpSize += 20;
+    // As we don't have actually access to the nonce, we will use the number of contracts existing in the chain
+    rlpSize += (nonce < 0x80)
+      ? 1 : 1 + Utils::bytesRequired(nonce);
+    Bytes rlp;
+    rlp.insert(rlp.end(), rlpSize);
+    rlp.insert(rlp.end(), address.cbegin(), address.cend());
+    rlp.insert(rlp.end(), (nonce < 0x80)
+      ? (char)nonce
+      : (char)0x80 + Utils::bytesRequired(nonce)
+    );
+    return Address(Utils::sha3(rlp).view(12));
+  }
+
+  bool isEvmContract(const Address& address) {
+    auto it = this->accounts.find(address);
+    if (it == this->accounts.end()) {
+      return false;
+    }
+    return it->second.code.second.size() > 0;
+  }
+
+  void setTxContext(const ethCallInfo& tx,
+                    const Hash& blockHash,
+                    const uint64_t& blockHeight,
+                    const Address& blockCoinbase,
+                    const uint64_t& blockTimestamp,
+                    const uint64_t& blockGasLimit,
+                    const uint256_t& chainId) {
+
+      const auto [from, to, gasLimit, gasPrice, value, functor, data] = tx;
+      this->currentTxContext.tx_gas_price = Utils::uint256ToEvmcUint256(gasPrice);
+      this->currentTxContext.tx_origin = from.toEvmcAddress();
+      this->currentTxContext.block_coinbase = blockCoinbase.toEvmcAddress();
+      this->currentTxContext.block_number = blockHeight;
+      this->currentTxContext.block_timestamp = blockTimestamp;
+      this->currentTxContext.block_gas_limit = blockGasLimit;
+      this->currentTxContext.block_prev_randao = Utils::uint256ToEvmcUint256(0);
+      this->currentTxContext.chain_id = Utils::uint256ToEvmcUint256(chainId);
+      this->currentTxContext.block_base_fee = Utils::uint256ToEvmcUint256(0);
+      this->currentTxContext.blob_base_fee = Utils::uint256ToEvmcUint256(0);
+      this->currentTxContext.blob_hashes = nullptr;
+    }
 
     bool account_exists(const evmc::address& addr) const noexcept override {
       try {
@@ -187,7 +300,6 @@ class EVMHost : public evmc::Host {
     }
 
     evmc::Result call(const evmc_message& msg) noexcept override {
-      std::cout << "CALL IS CALLED!!!" << std::endl;
       if (msg.recipient == ECRECOVER_ADDRESS) {
         return Precompile::ecrecover(msg, m_ecrecover_results);
       }
@@ -203,8 +315,26 @@ class EVMHost : public evmc::Host {
     }
 
     evmc::bytes32 get_block_hash(int64_t number) const noexcept override {
-      // TODO: Implement after integrating with state
-      return {};
+      try {
+        if (!this->storage) {
+          return {};
+        }
+        uint64_t blockNumber = static_cast<uint64_t>(number);
+        if (blockNumber > this->currentTxContext.block_number) {
+          return {};
+        }
+
+        auto block = this->storage->getBlock(blockNumber);
+        if (!block) {
+          return {};
+        }
+
+        return block->hash().toEvmcBytes32();
+      } catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        this->shouldRevert = true;
+        return {};
+      }
     }
 
     void emit_log(const evmc::address& addr, const uint8_t* data, size_t data_size, const evmc::bytes32 topics[], size_t topics_count) noexcept override {
@@ -254,38 +384,75 @@ class EVMHost : public evmc::Host {
     }
 
     void commit() {
-      // TODO: Use internal variables to commit the state
       for (const auto& [addr, key] : this->accessedStorages) {
         this->accounts[addr].storage[key].first = this->accounts[addr].storage[key].second;
-      }
-      for (const auto& account : this->accessedAccounts) {
-        auto& acc = this->accounts[account];
-        acc.nonce.first = this->accounts[account].nonce.second;
-        acc.balance.first = this->accounts[account].balance.second;
-        acc.code.first = this->accounts[account].code.second;
-        acc.codeHash.first = this->accounts[account].codeHash.second;
       }
       for (const auto& addr : this->accessedTransients) {
         this->accounts[addr].transientStorage.clear();
       }
       m_ecrecover_results.clear();
+      this->accessedStorages.clear();
+      this->accessedTransients.clear();
+      this->currentTxHash = Hash();
+    }
+
+    void commitBalance() {
+      for (const auto& addr : this->accessedAccountsBalances) {
+        this->accounts[addr].balance.first = this->accounts[addr].balance.second;
+      }
+      this->accessedAccountsBalances.clear();
+    }
+
+    void revertBalance() {
+      for (const auto& addr : this->accessedAccountsBalances) {
+        this->accounts[addr].balance.second = this->accounts[addr].balance.first;
+      }
+      this->accessedAccountsBalances.clear();
+    }
+
+    void commitCode() {
+      for (const auto& addr : this->accessedAccountsCode) {
+        this->accounts[addr].code.first = this->accounts[addr].code.second;
+        this->accounts[addr].codeHash.first = this->accounts[addr].codeHash.second;
+      }
+      this->accessedAccountsCode.clear();
+    }
+
+    void revertCode() {
+      for (const auto& addr : this->accessedAccountsCode) {
+        this->accounts[addr].code.second = this->accounts[addr].code.first;
+        this->accounts[addr].codeHash.second = this->accounts[addr].codeHash.first;
+      }
+      this->accessedAccountsCode.clear();
+    }
+
+    void commitNonce() {
+      for (const auto& addr : this->accessedAccountsNonces) {
+        this->accounts[addr].nonce.first = this->accounts[addr].nonce.second;
+      }
+    }
+
+    void revertNonce() {
+      for (const auto& addr : this->accessedAccountsNonces) {
+        this->accounts[addr].nonce.second = this->accounts[addr].nonce.first;
+      }
     }
 
     void revert() {
-      // TODO: Use internal variables to revert the state
       for (const auto& [addr, key] : this->accessedStorages) {
         this->accounts[addr].storage[key].second = this->accounts[addr].storage[key].first;
-      }
-      for (const auto& account : this->accessedAccounts) {
-        auto& acc = this->accounts[account];
-        acc.nonce.second = this->accounts[account].nonce.first;
-        acc.balance.second = this->accounts[account].balance.first;
-        acc.code.second = this->accounts[account].code.first;
-        acc.codeHash.second = this->accounts[account].codeHash.first;
       }
       for (const auto& addr : this->accessedTransients) {
         this ->accounts[addr].transientStorage.clear();
       }
+      for (const auto& addr : this->recentlyCreatedContracts) {
+        this->contractAddresses.erase(addr);
+      }
+      m_ecrecover_results.clear();
+      this->accessedStorages.clear();
+      this->accessedTransients.clear();
+      this->recentlyCreatedContracts.clear();
+      this->currentTxHash = Hash();
     }
 };
 

@@ -390,7 +390,7 @@ if(BUILD_AVALANCHEGO)
   target_link_libraries(orbitersdk_lib PRIVATE
     ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS} ${Protobuf_LIBRARIES}
     ${GRPC_LIBRARIES} ${CARES_LIBRARY} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} absl::flags
-    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${EVMC_LIBRARY} ${EVMONE_LIBRARY}
+    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${EVMC_LIBRARY} ${EVMONE_LIBRARY} /usr/local/lib/libevmone.so
   )
 
   set_target_properties(orbitersdk_lib PROPERTIES COMPILE_FLAGS "-DAVALANCHEGO_COMPATIBLE=1")
@@ -411,7 +411,7 @@ else()
 
   target_link_libraries(orbitersdk_lib PRIVATE
     ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
-    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES}
+    Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} /usr/local/lib/libevmone.so
   )
 
   set_target_properties(orbitersdk_lib PROPERTIES COMPILE_FLAGS "-DAVALANCHEGO_COMPATIBLE=0")

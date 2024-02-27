@@ -8,6 +8,7 @@ See the LICENSE.txt file in the project root for more information.
 #ifndef STATE_H
 #define STATE_H
 
+#include "evmhost.hpp"
 #include "../contract/contract.h"
 #include "../contract/contractmanager.h"
 #include "../utils/utils.h"
@@ -30,7 +31,8 @@ class State {
     P2P::ManagerNormal& p2pManager_;  ///< Reference to the P2P connection manager.
     rdPoS rdpos_; ///< rdPoS object (consensus).
     ContractManager contractManager_; ///< Contract Manager.
-    std::unordered_map<Address, Account, SafeHash> accounts_; ///< Map with information about blockchain accounts (Address -> Account).
+    evmc_vm *evmone_; ///< EVMONE VM.
+    mutable EVMHost evmHost_; ///< EVM Host. mutable because we are funnnyyyy :)))
     std::unordered_map<Hash, TxBlock, SafeHash> mempool_; ///< TxBlock mempool.
     mutable std::shared_mutex stateMutex_;  ///< Mutex for managing read/write access to the state object.
     bool processingPayable_ = false;  ///< Indicates whether the state is currently processing a payable contract function.
@@ -49,7 +51,11 @@ class State {
      * @param blockHash The hash of the block being processed.
      * @param txIndex The index of the transaction inside the block that is being processed.
      */
-    void processTransaction(const TxBlock& tx, const Hash& blockHash, const uint64_t& txIndex);
+ void processTransaction(const TxBlock& tx, const Hash& blockHash, const uint64_t& blockHeight,
+                 const Address& blockCoinbase,
+                 const uint64_t& blockTimestamp,
+                 const uint64_t& blockGasLimit,
+                 const uint256_t& chainId, const uint64_t& txIndex);
 
     /**
      * Update the mempool, remove transactions that are in the given block, and leave only valid transactions in it.
@@ -113,7 +119,7 @@ class State {
      */
     uint64_t getNativeNonce(const Address& addr) const;
 
-    std::unordered_map<Address, Account, SafeHash> getAccounts() const; ///< Getter for `accounts_`. Returns a copy.
+    //std::unordered_map<Address, Account, SafeHash> getAccounts() const; ///< Getter for `accounts_`. Returns a copy.
     std::unordered_map<Hash, TxBlock, SafeHash> getMempool() const; ///< Getter for `mempool_`. Returns a copy.
 
     /// Get the mempool's current size.
@@ -214,7 +220,7 @@ class State {
      * @param callInfo Tuple with info about the call (from, to, gasLimit, gasPrice, value, data).
      * @return `true` if the call is valid, `false` otherwise.
      */
-    bool estimateGas(const ethCallInfo& callInfo);
+    uint256_t estimateGas(const ethCallInfo& callInfo);
 
     /**
      * Update the State's account balances after a contract call. Called by ContractManager.

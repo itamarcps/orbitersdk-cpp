@@ -23,7 +23,7 @@ else()
      ${CMAKE_SOURCE_DIR}/src/core/storage.h
      ${CMAKE_SOURCE_DIR}/src/core/rdpos.h
      ${CMAKE_SOURCE_DIR}/src/core/evmhost.hpp
-     ${CMAKE_SOURCE_DIR}/src/core/ecrecoverprecompile.hpp
+     ${CMAKE_SOURCE_DIR}/src/core/ecrecoverprecompile.h
     PARENT_SCOPE
   )
 
@@ -32,6 +32,7 @@ else()
      ${CMAKE_SOURCE_DIR}/src/core/state.cpp
      ${CMAKE_SOURCE_DIR}/src/core/storage.cpp
      ${CMAKE_SOURCE_DIR}/src/core/rdpos.cpp
+     ${CMAKE_SOURCE_DIR}/src/core/ecrecoverprecompile.cpp
     PARENT_SCOPE
   )
 endif()

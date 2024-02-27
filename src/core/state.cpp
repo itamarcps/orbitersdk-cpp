@@ -6,6 +6,7 @@ See the LICENSE.txt file in the project root for more information.
 */
 
 #include "state.h"
+#include <evmone/evmone.h>
 
 State::State(
   DB& db,
@@ -14,7 +15,7 @@ State::State(
   const Options& options
 ) : db_(db), storage_(storage), p2pManager_(p2pManager), options_(options),
 rdpos_(db, storage, p2pManager, options, *this),
-contractManager_(db, *this, rdpos_, options)
+contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evmHost_(this->evmone_, &this->storage_)
 {
   std::unique_lock lock(this->stateMutex_);
   auto accountsFromDB = db_.getBatch(DBPrefix::nativeAccounts);
@@ -50,7 +51,8 @@ contractManager_(db, *this, rdpos_, options)
     }
     uint64_t nonce = Utils::fromBigEndian<uint64_t>(data.subspan(2 + balanceSize, nonceSize));
 
-    this->accounts_.insert({Address(dbEntry.key), Account(std::move(balance), std::move(nonce))});
+    this->evmHost_.accounts[Address(dbEntry.key)].balance.first = this->evmHost_.accounts[Address(dbEntry.key)].balance.second = balance;
+    this->evmHost_.accounts[Address(dbEntry.key)].nonce.first = this->evmHost_.accounts[Address(dbEntry.key)].nonce.second = nonce;
   }
   auto latestBlock = this->storage_.latest();
   this->contractManager_.updateContractGlobals(Secp256k1::toAddress(latestBlock->getValidatorPubKey()), latestBlock->hash(), latestBlock->getNHeight(), latestBlock->getTimestamp());
@@ -66,21 +68,23 @@ State::~State() {
   // If the nonce equals to 0, it will be *empty*
   DBBatch accountsBatch;
   std::unique_lock lock(this->stateMutex_);
-  for (const auto& [address, account] : this->accounts_) {
+  // Delete the vm_ pointer as it is no longer needed.
+  evmc_destroy(this->evmone_);
+  for (const auto& [address, account] : this->evmHost_.accounts) {
     // Serialize Balance.
     Bytes serializedBytes;
-    if (account.balance == 0) {
+    if (account.balance.second == 0) {
       serializedBytes = Bytes(1, 0x00);
     } else {
-      serializedBytes = Utils::uintToBytes(Utils::bytesRequired(account.balance));
-      Utils::appendBytes(serializedBytes, Utils::uintToBytes(account.balance));
+      serializedBytes = Utils::uintToBytes(Utils::bytesRequired(account.balance.second));
+      Utils::appendBytes(serializedBytes, Utils::uintToBytes(account.balance.second));
     }
     // Serialize Account.
-    if (account.nonce == 0) {
+    if (account.nonce.second == 0) {
       Utils::appendBytes(serializedBytes, Bytes(1, 0x00));
     } else {
-      Utils::appendBytes(serializedBytes, Utils::uintToBytes(Utils::bytesRequired(account.nonce)));
-      Utils::appendBytes(serializedBytes, Utils::uintToBytes(account.nonce));
+      Utils::appendBytes(serializedBytes, Utils::uintToBytes(Utils::bytesRequired(account.nonce.second)));
+      Utils::appendBytes(serializedBytes, Utils::uintToBytes(account.nonce.second));
     }
     accountsBatch.push_back(address.get(), serializedBytes, DBPrefix::nativeAccounts);
   }
@@ -100,13 +104,13 @@ TxInvalid State::validateTransactionInternal(const TxBlock& tx) const {
     Logger::logToDebug(LogType::INFO, Log::state, __func__, "Transaction: " + tx.hash().hex().get() + " already in mempool");
     return TxInvalid::NotInvalid;
   }
-  auto accountIt = this->accounts_.find(tx.getFrom());
-  if (accountIt == this->accounts_.end()) {
+  auto accountIt = this->evmHost_.accounts.find(tx.getFrom());
+  if (accountIt == this->evmHost_.accounts.end()) {
     Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Account doesn't exist (0 balance and 0 nonce)");
     return TxInvalid::InvalidBalance;
   }
-  const auto& accBalance = accountIt->second.balance;
-  const auto& accNonce = accountIt->second.nonce;
+  const auto& accBalance = accountIt->second.balance.second;
+  const auto& accNonce = accountIt->second.nonce.second;
   uint256_t txWithFees = tx.getValue() + (tx.getGasLimit() * tx.getMaxFeePerGas());
   if (txWithFees > accBalance) {
     Logger::logToDebug(LogType::ERROR, Log::state, __func__,
@@ -123,37 +127,80 @@ TxInvalid State::validateTransactionInternal(const TxBlock& tx) const {
   return TxInvalid::NotInvalid;
 }
 
-void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const uint64_t& txIndex) {
+void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const uint64_t& blockHeight,
+                 const Address& blockCoinbase,
+                 const uint64_t& blockTimestamp,
+                 const uint64_t& blockGasLimit,
+                 const uint256_t& chainId, const uint64_t& txIndex) {
   // Lock is already called by processNextBlock.
   // processNextBlock already calls validateTransaction in every tx,
   // as it calls validateNextBlock as a sanity check.
-  auto accountIt = this->accounts_.find(tx.getFrom());
-  auto& balance = accountIt->second.balance;
-  auto& nonce = accountIt->second.nonce;
-  try {
-    uint256_t txValueWithFees = tx.getValue() + (
-      tx.getGasLimit() * tx.getMaxFeePerGas()
-    ); // This needs to change with payable contract functions
-    balance -= txValueWithFees;
-    this->accounts_[tx.getTo()].balance += tx.getValue();
-    if (this->contractManager_.isContractCall(tx)) {
-      Utils::safePrint(std::string("Processing transaction call txid: ") + tx.hash().hex().get());
-      if (this->contractManager_.isPayable(tx.txToCallInfo())) this->processingPayable_ = true;
-      this->contractManager_.callContract(tx, blockHash, txIndex);
-      this->processingPayable_ = false;
+  auto& toAccountIt = this->evmHost_.accounts[tx.getTo()];
+  auto accountIt = this->evmHost_.accounts.find(tx.getFrom());
+  auto& toBalance = toAccountIt.balance.second;
+  auto& balance = accountIt->second.balance.second;
+  auto& nonce = accountIt->second.nonce.second;
+  this->evmHost_.accessedAccountsBalances.emplace_back(tx.getFrom());
+  this->evmHost_.accessedAccountsNonces.emplace_back(tx.getFrom());
+  if (this->evmHost_.isEvmContract(tx.getTo()) || tx.getTo() == Address()) {
+    // EVM Call! Set the tx context and then call the contract.
+    // First, try transfering the balance!
+    this->evmHost_.accessedAccountsBalances.emplace_back(tx.getFrom());
+    if (tx.getValue()) {
+      toBalance += tx.getValue();
+      balance -= tx.getValue();
+      this->evmHost_.accessedAccountsBalances.emplace_back(tx.getTo());
     }
-  } catch (const std::exception& e) {
-    Logger::logToDebug(LogType::ERROR, Log::state, __func__,
-      "Transaction: " + tx.hash().hex().get() + " failed to process, reason: " + e.what()
-    );
-    if(this->processingPayable_) {
+    // Then set context
+    this->evmHost_.setTxContext(tx.txToCallInfo(), blockHash, blockHeight, blockCoinbase, blockTimestamp, blockGasLimit, chainId);
+    this->evmHost_.currentTxHash = tx.hash();
+    auto evmCallResult = this->evmHost_.execute(tx.txToCallInfo());
+    uint256_t gasUsed = tx.getGasLimit() - (evmCallResult.gas_left + 21000);
+    toBalance += gasUsed * tx.getMaxFeePerGas();
+
+    if (evmCallResult.status_code || this->evmHost_.shouldRevert) {
+      this->evmHost_.shouldRevert = false;
+      // Tx went badly, revert the changes.
       balance += tx.getValue();
-      this->accounts_[tx.getTo()].balance -= tx.getValue();
-      this->processingPayable_ = false;
+      toBalance -= tx.getValue();
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__,
+        "Transaction: " + tx.hash().hex().get() + " failed to process, reason: " + std::to_string(evmCallResult.status_code)
+      );
+      this->evmHost_.revert();
+      this->evmHost_.revertCode();
     }
-    balance += tx.getValue();
+  } else {
+    /// Classic OrbiterSDK transaction
+    try {
+      uint256_t txValueWithFees = tx.getValue() + (
+        tx.getGasLimit() * tx.getMaxFeePerGas()
+      ); // This needs to change with payable contract functions
+      balance -= txValueWithFees;
+      toBalance += tx.getValue();
+      if (this->contractManager_.isContractCall(tx)) {
+        Utils::safePrint(std::string("Processing transaction call txid: ") + tx.hash().hex().get());
+        if (this->contractManager_.isPayable(tx.txToCallInfo())) this->processingPayable_ = true;
+        this->contractManager_.callContract(tx, blockHash, txIndex);
+        this->processingPayable_ = false;
+      }
+      // We need to take note of the accessed accounts in other to call commit() or revert() on them to update nonce/balance.
+      this->evmHost_.accessedAccountsBalances.emplace_back(tx.getTo());
+      this->evmHost_.commit();
+    } catch (const std::exception& e) {
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__,
+        "Transaction: " + tx.hash().hex().get() + " failed to process, reason: " + e.what()
+      );
+      if(this->processingPayable_) {
+        balance += tx.getValue();
+        toBalance -= tx.getValue();
+        this->processingPayable_ = false;
+      }
+      balance += tx.getValue();
+    }
   }
   nonce++;
+  this->evmHost_.commitNonce();
+  this->evmHost_.commitBalance();
 }
 
 void State::refreshMempool(const Block& block) {
@@ -182,22 +229,22 @@ void State::refreshMempool(const Block& block) {
 
 uint256_t State::getNativeBalance(const Address &addr) const {
   std::shared_lock lock(this->stateMutex_);
-  auto it = this->accounts_.find(addr);
-  if (it == this->accounts_.end()) return 0;
-  return it->second.balance;
+  auto it = this->evmHost_.accounts.find(addr);
+  if (it == this->evmHost_.accounts.end()) return 0;
+  return it->second.balance.second;
 }
 
 uint64_t State::getNativeNonce(const Address& addr) const {
   std::shared_lock lock(this->stateMutex_);
-  auto it = this->accounts_.find(addr);
-  if (it == this->accounts_.end()) return 0;
-  return it->second.nonce;
+  auto it = this->evmHost_.accounts.find(addr);
+  if (it == this->evmHost_.accounts.end()) return 0;
+  return it->second.nonce.second;
 }
 
-std::unordered_map<Address, Account, SafeHash> State::getAccounts() const {
-  std::shared_lock lock(this->stateMutex_);
-  return this->accounts_;
-}
+// std::unordered_map<Address, Account, SafeHash> State::getAccounts() const {
+//   std::shared_lock lock(this->stateMutex_);
+//   return this->evmHost_.accounts;
+// }
 
 std::unordered_map<Hash, TxBlock, SafeHash> State::getMempool() const {
   std::shared_lock lock(this->stateMutex_);
@@ -278,7 +325,14 @@ void State::processNextBlock(Block&& block) {
   // Process transactions of the block within the current state
   uint64_t txIndex = 0;
   for (auto const& tx : block.getTxs()) {
-    this->processTransaction(tx, blockHash, txIndex);
+    this->processTransaction(tx,
+      blockHash,
+      block.getNHeight(),
+      Secp256k1::toAddress(block.getValidatorPubKey()),
+      block.getTimestamp(),
+      100000000,
+      this->options_.getChainID(),
+      txIndex);
     txIndex++;
   }
 
@@ -336,10 +390,13 @@ std::unique_ptr<TxBlock> State::getTxFromMempool(const Hash &txHash) const {
 
 void State::addBalance(const Address& addr) {
   std::unique_lock lock(this->stateMutex_);
-  this->accounts_[addr].balance += uint256_t("1000000000000000000000");
+  this->evmHost_.accounts[addr].balance.first += uint256_t("1000000000000000000000");
+  this->evmHost_.accounts[addr].balance.second += uint256_t("1000000000000000000000");
 }
 
-Bytes State::ethCall(const ethCallInfo& callInfo) const{
+Bytes State::ethCall(const ethCallInfo& callInfo) const {
+  const auto& [from, to, gasLimit, gasPrice, value, functor, data] = callInfo;
+
   std::shared_lock lock(this->stateMutex_);
   auto &address = std::get<1>(callInfo);
   if (this->contractManager_.isContractAddress(address)) {
@@ -347,10 +404,38 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const{
   } else {
     return {};
   }
+
+  if (this->evmHost_.isEvmContract(to)) {
+    Utils::safePrint("Estimating gas from evm...");
+    if (value) {
+      this->evmHost_.accounts[from].balance.second -= value;
+      this->evmHost_.accounts[to].balance.second += value;
+    }
+    auto latestBlock = this->storage_.latest();
+    this->evmHost_.setTxContext(callInfo,
+      latestBlock->hash(),
+      latestBlock->getNHeight(),
+      Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
+      latestBlock->getTimestamp(),
+      100000000,
+      this->options_.getChainID());
+    auto evmCallResult = this->evmHost_.execute(callInfo);
+
+    // Revert EVERYTHING from the call.
+    this->evmHost_.revert();
+    this->evmHost_.revertCode();
+    this->evmHost_.revertBalance();
+
+    if (evmCallResult.status_code) {
+      throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+    }
+    return Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size);
+  }
 }
 
-bool State::estimateGas(const ethCallInfo& callInfo) {
+uint256_t State::estimateGas(const ethCallInfo& callInfo) {
   std::shared_lock lock(this->stateMutex_);
+  uint64_t baseGas = 21000;
   const auto& [from, to, gasLimit, gasPrice, value, functor, data] = callInfo;
 
   // Check balance/gasLimit/gasPrice if available.
@@ -359,9 +444,9 @@ bool State::estimateGas(const ethCallInfo& callInfo) {
     if (gasLimit && gasPrice) {
       totalGas = gasLimit * gasPrice;
     }
-    auto it = this->accounts_.find(from);
-    if (it == this->accounts_.end()) return false;
-    if (it->second.balance < value + totalGas) return false;
+    auto it = this->evmHost_.accounts.find(from);
+    if (it == this->evmHost_.accounts.end()) return 0;
+    if (it->second.balance.second < value + totalGas) return 0;
   }
 
   if (this->contractManager_.isContractAddress(to)) {
@@ -369,14 +454,45 @@ bool State::estimateGas(const ethCallInfo& callInfo) {
     this->contractManager_.validateCallContractWithTx(callInfo);
   }
 
-  return true;
+  if (this->evmHost_.isEvmContract(to)) {
+    Utils::safePrint("Estimating gas from evm...");
+    if (value) {
+      this->evmHost_.accounts[from].balance.second -= value;
+      this->evmHost_.accounts[to].balance.second += value;
+    }
+    auto latestBlock = this->storage_.latest();
+    this->evmHost_.setTxContext(callInfo,
+      latestBlock->hash(),
+      latestBlock->getNHeight(),
+      Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
+      latestBlock->getTimestamp(),
+      100000000,
+      this->options_.getChainID());
+      auto evmCallResult = this->evmHost_.execute(callInfo);
+
+    // Revert EVERYTHING from the call.
+    this->evmHost_.revert();
+    this->evmHost_.revertCode();
+    this->evmHost_.revertBalance();
+
+    if (evmCallResult.status_code) {
+      throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+    }
+    auto gasUsed = gasLimit - evmCallResult.gas_left;
+    return gasUsed + baseGas;
+  }
+
+  return baseGas;
 }
 
 void State::processContractPayable(const std::unordered_map<Address, uint256_t, SafeHash>& payableMap) {
   if (!this->processingPayable_) throw DynamicException(
     "Uh oh, contracts are going haywire! Cannot change State while not processing a payable contract."
   );
-  for (const auto& [address, amount] : payableMap) this->accounts_[address].balance = amount;
+  for (const auto& [address, amount] : payableMap) {
+    this->evmHost_.accessedAccountsBalances.push_back(this->contractManager_.getContractAddress());
+    this->evmHost_.accounts[address].balance.second = amount;
+  }
 }
 
 std::vector<std::pair<std::string, Address>> State::getContracts() const {

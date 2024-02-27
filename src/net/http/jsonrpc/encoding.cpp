@@ -189,10 +189,11 @@ namespace JsonRPC::Encoding {
     json ret;
     ret["jsonrpc"] = "2.0";
     try {
-      if (!state.estimateGas(callInfo)) {
+      auto gas = state.estimateGas(callInfo);
+      if (!gas) {
         throw std::runtime_error("Insufficient balance for tx.value() + gas");
       }
-      ret["result"] = "0x5208"; // Fixed to 21000 for now.
+      ret["result"] = Hex::fromBytes(Utils::uintToBytes(gas), true).forRPC();
     } catch (std::exception& e) {
       ret["error"]["code"] = -32000;
       ret["error"]["message"] = "Internal error: " + std::string(e.what());

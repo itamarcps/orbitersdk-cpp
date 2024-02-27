@@ -278,9 +278,9 @@ void ContractManagerInterface::populateBalance(const Address &address) const {
     "Contracts going haywire! Trying to call ContractState without an active callContract"
   );
   if (!this->manager_.callLogger_->hasBalance(address)) {
-    auto it = this->manager_.state_.accounts_.find(address);
+    auto it = this->manager_.state_.evmHost_.accounts.find(address);
     this->manager_.callLogger_->setBalanceAt(address,
-      (it != this->manager_.state_.accounts_.end()) ? it->second.balance : 0
+      (it != this->manager_.state_.evmHost_.accounts.end()) ? it->second.balance.second : 0
     );
   }
 }
