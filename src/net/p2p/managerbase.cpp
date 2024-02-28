@@ -102,7 +102,7 @@ namespace P2P {
     std::scoped_lock lock(this->stateMutex_);
     if (this->started_) return;
     this->started_ = true;
-    this->threadPool_ = std::make_unique<BS::thread_pool_light>(std::thread::hardware_concurrency() * 4);
+    this->threadPool_ = std::make_unique<BS::thread_pool_light>(4);
     this->server_.start();
     this->clientfactory_.start();
   }

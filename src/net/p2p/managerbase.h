@@ -104,8 +104,8 @@ namespace P2P {
         const unsigned int& minConnections, const unsigned int& maxConnections
       ) : serverPort_(options.getP2PPort()), nodeType_(nodeType), options_(options),
         minConnections_(minConnections), maxConnections_(maxConnections),
-        server_(hostIp, options.getP2PPort(), 4, *this),
-        clientfactory_(*this, 4),
+        server_(hostIp, options.getP2PPort(), 2, *this),
+        clientfactory_(*this, 2),
         discoveryWorker_(*this)
       {};
 

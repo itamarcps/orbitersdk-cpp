@@ -43,7 +43,7 @@ Block::Block(const BytesArrView bytes, const uint64_t& requiredChainId) {
     // If we have up to X block txs or only one physical thread
     // for some reason, deserialize normally.
     // Otherwise, parallelize into threads/asyncs.
-    unsigned int thrNum = std::thread::hardware_concurrency();
+    unsigned int thrNum = 4;
     if (thrNum <= 1 || txCount <= 2000) {
       for (uint64_t i = 0; i < txCount; ++i) {
         uint64_t txSize = Utils::bytesToUint32(bytes.subspan(index, 4));
