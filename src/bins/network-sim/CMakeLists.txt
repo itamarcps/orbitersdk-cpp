@@ -20,7 +20,7 @@ else()
         Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} orbitersdk_lib
     )
 
-      # Compile and link the ABI generator executable
+      # Compile and link the network-sim executable
     add_executable(network-sim "main.cpp")
 
     add_dependencies(network-sim orbitersdk_lib network_sim_lib)
