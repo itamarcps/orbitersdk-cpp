@@ -528,12 +528,14 @@ public:
       for (const auto& addr : this->accessedAccountsNonces) {
         this->accounts[addr].nonce.first = this->accounts[addr].nonce.second;
       }
+      this->accessedAccountsNonces.clear();
     }
 
     void revertNonce() {
       for (const auto& addr : this->accessedAccountsNonces) {
         this->accounts[addr].nonce.second = this->accounts[addr].nonce.first;
       }
+      this->accessedAccountsNonces.clear();
     }
 
     void revert() {
