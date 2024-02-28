@@ -32,24 +32,8 @@ contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evm
 
   for (const auto& dbEntry : accountsFromDB) {
     BytesArrView data(dbEntry.value);
-    if (dbEntry.key.size() != 20) {
-      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Error when loading State from DB, address from DB size mismatch");
-      throw DynamicException("Error when loading State from DB, address from DB size mismatch");
-    }
-    uint8_t balanceSize = Utils::fromBigEndian<uint8_t>(data.subspan(0,1));
-    if (data.size() + 1 < data.size()) {
-      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Error when loading State from DB, value from DB doesn't size mismatch on balanceSize");
-      throw DynamicException("Error when loading State from DB, value from DB size mismatch on balanceSize");
-    }
-
-    uint256_t balance = Utils::fromBigEndian<uint256_t>(data.subspan(1, balanceSize));
-    uint8_t nonceSize = Utils::fromBigEndian<uint8_t>(data.subspan(1 + balanceSize, 1));
-
-    if (2 + balanceSize + nonceSize != data.size()) {
-      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Error when loading State from DB, value from DB doesn't size mismatch on nonceSize");
-      throw DynamicException("Error when loading State from DB, value from DB size mismatch on nonceSize");
-    }
-    uint64_t nonce = Utils::fromBigEndian<uint64_t>(data.subspan(2 + balanceSize, nonceSize));
+    uint256_t balance = Utils::bytesToUint256(data.subspan(0,32));
+    uint256_t nonce = Utils::bytesToUint256(data.subspan(32));
 
     this->evmHost_.accounts[Address(dbEntry.key)].balance.first = this->evmHost_.accounts[Address(dbEntry.key)].balance.second = balance;
     this->evmHost_.accounts[Address(dbEntry.key)].nonce.first = this->evmHost_.accounts[Address(dbEntry.key)].nonce.second = nonce;
@@ -66,30 +50,15 @@ State::~State() {
   // DB is stored as following
   // Under the DBPrefix::nativeAccounts
   // Each key == Address
-  // Each Value == Balance + uint256_t (not exact bytes)
-  // Value == 1 Byte (Balance Size) + N Bytes (Balance) + 1 Byte (Nonce Size) + N Bytes (Nonce).
-  // Max size for Value = 32 Bytes, Max Size for Nonce = 8 Bytes.
-  // If the nonce equals to 0, it will be *empty*
+  // Each Value == uint256_t + uint256
   DBBatch accountsBatch;
   std::unique_lock lock(this->stateMutex_);
   // Delete the vm_ pointer as it is no longer needed.
   evmc_destroy(this->evmone_);
   for (const auto& [address, account] : this->evmHost_.accounts) {
-    // Serialize Balance.
     Bytes serializedBytes;
-    if (account.balance.second == 0) {
-      serializedBytes = Bytes(1, 0x00);
-    } else {
-      serializedBytes = Utils::uintToBytes(Utils::bytesRequired(account.balance.second));
-      Utils::appendBytes(serializedBytes, Utils::uintToBytes(account.balance.second));
-    }
-    // Serialize Account.
-    if (account.nonce.second == 0) {
-      Utils::appendBytes(serializedBytes, Bytes(1, 0x00));
-    } else {
-      Utils::appendBytes(serializedBytes, Utils::uintToBytes(Utils::bytesRequired(account.nonce.second)));
-      Utils::appendBytes(serializedBytes, Utils::uintToBytes(account.nonce.second));
-    }
+    Utils::appendBytes(serializedBytes, Utils::uint256ToBytes(account.balance.second));
+    Utils::appendBytes(serializedBytes, Utils::uint256ToBytes(account.nonce.second));
     accountsBatch.push_back(address.get(), serializedBytes, DBPrefix::nativeAccounts);
   }
 
