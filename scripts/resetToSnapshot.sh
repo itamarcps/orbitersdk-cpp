@@ -20,6 +20,6 @@ rm -rf local_testnet/local_testnet_validator3/blockchain/database
 rm -rf local_testnet/local_testnet_validator4/blockchain/database
 rm -rf local_testnet/local_testnet_validator5/blockchain/database
 
-cp -r local_testnet_snapshot/. local_testnet/
+tar -xvf local_testnet.tar.gz
 echo "Local testnet reset to snapshot"
 
