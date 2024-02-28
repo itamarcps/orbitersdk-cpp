@@ -22,6 +22,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 SET(DEBUG ON CACHE BOOL "Debug mode")
+SET(BUILD_NETWORK_SIM ON)
 if(DEBUG)
   set(CMAKE_CXX_FLAGS "-O0 -g -fsanitize=address -fno-inline -fno-eliminate-unused-debug-types -fstack-protector -Werror=unused-variable") # Provides faster compile time.
 elseif(SONARQUBE_ANALYSIS)

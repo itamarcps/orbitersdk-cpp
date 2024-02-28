@@ -22,9 +22,9 @@ contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evm
   if (accountsFromDB.empty()) {
     for (const auto& [account, balance] : options_.getGenesisBalances()) {
       // Initialize all accounts within options genesis balances.
-      Bytes value = Utils::uintToBytes(Utils::bytesRequired(balance));
-      Utils::appendBytes(value,Utils::uintToBytes(balance));
-      value.insert(value.end(), 0x00);
+      Bytes value;
+      Utils::appendBytes(value, Utils::uint256ToBytes(balance));
+      Utils::appendBytes(value, Utils::uint64ToBytes(0));
       db_.put(account.get(), value, DBPrefix::nativeAccounts);
     }
     accountsFromDB = db_.getBatch(DBPrefix::nativeAccounts);
