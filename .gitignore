@@ -1,6 +1,7 @@
 ABI/
 build/
 testdump/
+local_testnet.tar.gz
 debug.txt
 debug.log
 log.txt
