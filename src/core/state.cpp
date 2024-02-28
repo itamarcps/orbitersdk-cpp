@@ -33,7 +33,7 @@ contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evm
   for (const auto& dbEntry : accountsFromDB) {
     BytesArrView data(dbEntry.value);
     uint256_t balance = Utils::bytesToUint256(data.subspan(0,32));
-    uint256_t nonce = Utils::bytesToUint256(data.subspan(32));
+    uint64_t nonce = Utils::bytesToUint64(data.subspan(32));
 
     this->evmHost_.accounts[Address(dbEntry.key)].balance.first = this->evmHost_.accounts[Address(dbEntry.key)].balance.second = balance;
     this->evmHost_.accounts[Address(dbEntry.key)].nonce.first = this->evmHost_.accounts[Address(dbEntry.key)].nonce.second = nonce;
@@ -58,7 +58,7 @@ State::~State() {
   for (const auto& [address, account] : this->evmHost_.accounts) {
     Bytes serializedBytes;
     Utils::appendBytes(serializedBytes, Utils::uint256ToBytes(account.balance.second));
-    Utils::appendBytes(serializedBytes, Utils::uint256ToBytes(account.nonce.second));
+    Utils::appendBytes(serializedBytes, Utils::uint64ToBytes(account.nonce.second));
     accountsBatch.push_back(address.get(), serializedBytes, DBPrefix::nativeAccounts);
   }
 
