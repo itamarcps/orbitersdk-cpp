@@ -17,9 +17,7 @@ std::string parseJsonRpcRequest(
   json ret;
   uint64_t id = 0;
   try {
-    Utils::safePrint("HTTP Request: " + body);
     json request = json::parse(body);
-    Utils::safePrint("HTTP Request Parsed!");
     if (!JsonRPC::Decoding::checkJsonRPCSpec(request)) {
       ret["error"]["code"] = -32600;
       ret["error"]["message"] = "Invalid request - does not conform to JSON-RPC 2.0 spec";
@@ -98,7 +96,6 @@ std::string parseJsonRpcRequest(
         );
         break;
       case JsonRPC::Methods::eth_estimateGas: {
-        Utils::safePrint("Estimating gas...");
         ret = JsonRPC::Encoding::eth_estimateGas(
           JsonRPC::Decoding::eth_estimateGas(request, storage), state
         );
@@ -128,13 +125,11 @@ std::string parseJsonRpcRequest(
           JsonRPC::Decoding::eth_getCode(request, storage), state
         );
         break;
-      case JsonRPC::Methods::eth_sendRawTransaction: {
-        Utils::safePrint("Sending raw transaction...");
+      case JsonRPC::Methods::eth_sendRawTransaction:
         ret = JsonRPC::Encoding::eth_sendRawTransaction(
           JsonRPC::Decoding::eth_sendRawTransaction(request, options.getChainID()),
           state, p2p
         );
-      }
         break;
       case JsonRPC::Methods::eth_getTransactionByHash:
         ret = JsonRPC::Encoding::eth_getTransactionByHash(
@@ -163,7 +158,6 @@ std::string parseJsonRpcRequest(
         ret["error"]["message"] = "Method not found";
         break;
     }
-    Utils::safePrint("HTTP Response: " + ret.dump());
     if (request["id"].is_string()) {
       ret["id"] = request["id"].get<std::string>();
     } else if (request["id"].is_number()) {
@@ -181,7 +175,6 @@ std::string parseJsonRpcRequest(
     error["error"]["message"] = "Internal error: " + std::string(e.what());
     return error.dump();
   }
-  Utils::safePrint("Properly returning...");
   // Set back to the original id
   return ret.dump();
 }

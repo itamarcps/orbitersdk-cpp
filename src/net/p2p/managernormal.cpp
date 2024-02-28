@@ -123,11 +123,14 @@ namespace P2P{
       std::shared_lock broadcastLock(this->broadcastMutex_);
       auto it = broadcastedMessages_.find(message->id().toUint64());
       if (it != broadcastedMessages_.end() && it->second > 0) {
-        broadcastLock.unlock(); // Unlock before calling logToDebug to avoid waiting for the lock in the logToDebug function.
-        Logger::logToDebug(LogType::DEBUG, Log::P2PManager, __func__,
-          "Already broadcasted message " + message->id().hex().get() +
-          " to all nodes. Skipping broadcast."
-        );
+        if (it->second == 1) {
+          broadcastLock.unlock(); // Unlock before calling logToDebug to avoid waiting for the lock in the logToDebug function.
+          Logger::logToDebug(LogType::DEBUG, Log::P2PManager, __func__,
+            "Already broadcasted message " + message->id().hex().get() +
+            " to all nodes. Skipping broadcast."
+          );
+          ++it->second;
+        }
         return;
       }
     }

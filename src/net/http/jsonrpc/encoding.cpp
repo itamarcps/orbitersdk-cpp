@@ -174,8 +174,6 @@ namespace JsonRPC::Encoding {
     json ret;
     ret["jsonrpc"] = "2.0";
     try {
-      std::cout << "Calling State...: " << std::endl;
-      std::cout << "callInfo functor: " << std::get<5>(callInfo).hex() << std::endl;
       auto result = Hex::fromBytes(state.ethCall(callInfo), true);
       ret["result"] = result;
     } catch (std::exception& e) {

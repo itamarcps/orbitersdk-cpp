@@ -37,8 +37,6 @@ contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evm
 
     this->evmHost_.accounts[Address(dbEntry.key)].balance.first = this->evmHost_.accounts[Address(dbEntry.key)].balance.second = balance;
     this->evmHost_.accounts[Address(dbEntry.key)].nonce.first = this->evmHost_.accounts[Address(dbEntry.key)].nonce.second = nonce;
-    std::cout << "Loaded balance for address: " << Address(dbEntry.key).hex(true) << " balance: " << balance.str() << " nonce: " << nonce << std::endl;
-    std::cout << "Stored: " << this->evmHost_.accounts[Address(dbEntry.key)].balance.second.str() << " nonce: " << this->evmHost_.accounts[Address(dbEntry.key)].nonce.second << std::endl;
   }
   auto latestBlock = this->storage_.latest();
   this->contractManager_.updateContractGlobals(Secp256k1::toAddress(latestBlock->getValidatorPubKey()), latestBlock->hash(), latestBlock->getNHeight(), latestBlock->getTimestamp());
@@ -164,7 +162,6 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
             emittedEvent.topics,
             false
           );
-          std::cout << "Emitted events!" << std::endl;
           this->contractManager_.commitEvent(std::move(sdkEvent));
         }
       }

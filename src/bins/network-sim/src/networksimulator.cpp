@@ -120,6 +120,14 @@ void NetworkSimulator::setup() {
     std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << " ms" << std::endl;
   }
   std::cout << "Setup complete!" << std::endl;
+  // Write to "privkeys.txt" file one line per hex private key
+  std::ofstream privKeysFile("privkeys.txt");
+  for (auto& accounts : accounts_) {
+    for (auto& account : accounts) {
+      privKeysFile << account.privKey.hex() << std::endl;
+    }
+  }
+  privKeysFile.close();
 }
 
 void NetworkSimulator::run() {

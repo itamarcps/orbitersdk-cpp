@@ -55,28 +55,21 @@ public:
         throw std::runtime_error("EVMHost: Chain height mismatch, DB is corrupted");
       }
 
-      std::cout << "Loading from DB..." << std::endl;
-
       {
         auto accountsCodeBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
         auto accountsCodeHashBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
         auto contractAddressesBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
 
-        std::cout << "Loading account code, size: " << accountsCodeBatch.size() << std::endl;
         for (const auto& [key, value] : accountsCodeBatch) {
-          std::cout << "key: " << Hex::fromBytes(key) << std::endl;
-          std::cout << "key.size(): " << key.size() << std::endl;
           this->accounts[Address(key)].code.first = value;
           this->accounts[Address(key)].code.second = value;
         }
 
-        std::cout << "Loading account codeHash, size: " << accountsCodeHashBatch.size() << std::endl;
         for (const auto& [key, value] : accountsCodeHashBatch) {
           this->accounts[Address(key)].codeHash.first = Hash(value);
           this->accounts[Address(key)].codeHash.second = Hash(value);
         }
 
-        std::cout << "Loading contract addresses, size: " << contractAddressesBatch.size() << std::endl;
         for (const auto& [key, value] : contractAddressesBatch) {
           this->contractAddresses[Hash(key)] = Address(value);
         }
@@ -84,11 +77,8 @@ public:
 
       // We put these into their own scope because they use a lot of memory
       {
-        std::cout << "Loading account storage..." << std::endl;
         auto accountsStorageBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
         for (const auto& [key, value] : accountsStorageBatch) {
-          std::cout << "Tryingn to load storage for key: " << Hex::fromBytes(key) << std::endl;
-          std::cout << "Value: " << Hex::fromBytes(value) << std::endl;
           BytesArrView keyView(key);
           Address addr(keyView.subspan(0, 20));
           Hash realKey(keyView.subspan(20));
@@ -106,8 +96,7 @@ public:
     for (const auto& [address, account] : this->accounts) {
       batch.push_back(address.asBytes(), account.code.first, DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
       batch.push_back(address.asBytes(), account.codeHash.first.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
-      std::cout << "Dumping storage for: " << address.hex(true) << std::endl;
-      std::cout << "Storage size: " << account.storage.size() << std::endl;
+
       for (const auto& [key, value] : account.storage) {
         // Key for account storage will be address + key
         // Vaue is value.first.asBytes()
@@ -117,7 +106,6 @@ public:
       }
     }
 
-    std::cout << "dumping contract addresses, size: " << this->contractAddresses.size() << std::endl;
     for (const auto& [txHash, address] : this->contractAddresses) {
       batch.push_back(txHash.asBytes(), address.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
     }
@@ -179,7 +167,6 @@ public:
                fullData.data(), fullData.size()));
 
     if (creationResult.status_code) {
-      std::cout << "Bad news! Contract creation failed, reason: " << evmc_status_code_to_string(creationResult.status_code) << std::endl;
       return creationResult;
     }
     // Store contract code into the account
@@ -187,7 +174,6 @@ public:
     this->accounts[contractAddress].codeHash.second = Utils::sha3(code);
     this->accounts[contractAddress].code.second = code;
     // Stored used to revert in case of exception
-    std::cout << "Hash: " << this->currentTxHash.hex(true) << " created contract at: " << contractAddress.hex(true) << std::endl;
     this->recentlyCreatedContracts.push_back(currentTxHash);
     this->contractAddresses[currentTxHash] = contractAddress;
     this->accessedAccountsCode.push_back(contractAddress);
@@ -415,7 +401,6 @@ public:
     }
 
     evmc_tx_context get_tx_context() const noexcept override {
-      std::cout << "Getting tx context" << std::endl;
       return this->currentTxContext;
     }
 
