@@ -89,6 +89,19 @@ class SDKTestSuite {
       http_.stop();
     }
 
+
+    /**
+     * Initialize all components assuming that it was created previously. (load from DB)
+     * Keep in mind that this method will not create a new environment, it will load the previous one.
+     * @param sdkPath Path to the SDK folder.
+     */
+    static SDKTestSuite loadEnvironment(const std::string& sdkPath) {
+      if (!std::filesystem::exists(sdkPath + "/options.json")) {
+        throw DynamicException("SDKTestSuite::loadEnvironment: No options file found in the given path");
+      }
+      return SDKTestSuite(Options::fromFile(sdkPath));
+    }
+
     /**
      * Initialize all components of a full blockchain node.
      * @param sdkPath Path to the SDK folder.

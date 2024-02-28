@@ -79,6 +79,10 @@ Bytes ContractManager::getDeployedContracts() const {
 
 void ContractManager::ethCall(const ethCallInfo& callInfo) {
   Functor functor = std::get<5>(callInfo);
+  // Only chainOwner can call ContractManager functions
+  if (std::get<0>(callInfo) != this->options_.getChainOwner()) {
+    throw DynamicException("Only chainOwner can call ContractManager functions");
+  }
   std::function<void(const ethCallInfo&)> f;
   f = this->factory_->getCreateContractFunc(functor.asBytes());
   if (!f) {

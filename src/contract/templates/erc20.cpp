@@ -21,6 +21,7 @@ ERC20::ERC20(ContractManagerInterface &interface, const Address& address, DB& db
   }
   auto allowances = db_.getBatch(this->getNewPrefix("allowed_"));
   for (const auto& dbEntry : allowances) {
+    // TODO Fix this: dbEntry.key is an ADDRESS, not unique since its a nested map
     BytesArrView valueView(dbEntry.value);
     this->allowed_[Address(dbEntry.key)][Address(valueView.subspan(0, 20))] = Utils::fromBigEndian<uint256_t>(valueView.subspan(20));
   }

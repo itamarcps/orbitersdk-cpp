@@ -13,6 +13,7 @@ See the LICENSE.txt file in the project root for more information.
 #include "../utils/strings.h"
 #include "../utils/hex.h"
 #include "../utils/safehash.h"
+#include "../utils/db.h"
 #include "storage.h"
 
 #include "ecrecoverprecompile.h"
@@ -40,10 +41,100 @@ struct EVMAccount {
 
 class EVMHost : public evmc::Host {
 public:
-  EVMHost(evmc_vm* vm, const Storage* storage) : vm{vm}, storage(storage) {}
+  EVMHost(evmc_vm* vm_, const Storage* storage_, DB* db_, const Options* const options_) : vm{vm_}, storage(storage_), db(db_), options(options_) {
+    /// Load from DB if we have saved based on the current chain height
+    if (db->has(std::string("latest"), DBPrefix::evmHost)) {
+      auto latestSaved = Utils::bytesToUint64(db->get(std::string("latest"), DBPrefix::evmHost));
+      if (this->storage->latest()->getNHeight() != latestSaved) {
+        throw std::runtime_error("EVMHost: Chain height mismatch, DB is corrupted");
+      }
+
+      std::cout << "Loading from DB..." << std::endl;
+
+      {
+        auto accountsCodeBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
+        auto accountsCodeHashBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
+        auto contractAddressesBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
+
+        std::cout << "Loading account code, size: " << accountsCodeBatch.size() << std::endl;
+        for (const auto& [key, value] : accountsCodeBatch) {
+          std::cout << "key: " << Hex::fromBytes(key) << std::endl;
+          std::cout << "key.size(): " << key.size() << std::endl;
+          this->accounts[Address(key)].code.first = value;
+          this->accounts[Address(key)].code.second = value;
+        }
+
+        std::cout << "Loading account codeHash, size: " << accountsCodeHashBatch.size() << std::endl;
+        for (const auto& [key, value] : accountsCodeHashBatch) {
+          this->accounts[Address(key)].codeHash.first = Hash(value);
+          this->accounts[Address(key)].codeHash.second = Hash(value);
+        }
+
+        std::cout << "Loading contract addresses, size: " << contractAddressesBatch.size() << std::endl;
+        for (const auto& [key, value] : contractAddressesBatch) {
+          this->contractAddresses[Hash(key)] = Address(value);
+        }
+      }
+
+      // We put these into their own scope because they use a lot of memory
+      {
+        std::cout << "Loading account storage..." << std::endl;
+        auto accountsStorageBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
+        for (const auto& [key, value] : accountsStorageBatch) {
+          std::cout << "Tryingn to load storage for key: " << Hex::fromBytes(key) << std::endl;
+          std::cout << "Value: " << Hex::fromBytes(value) << std::endl;
+          BytesArrView keyView(key);
+          Address addr(keyView.subspan(0, 20));
+          Hash realKey(keyView.subspan(20));
+          this->accounts[addr].storage[realKey].first = Hash(value);
+          this->accounts[addr].storage[realKey].second = Hash(value);
+        }
+      }
+    }
+  }
+
+  ~EVMHost() override {
+    uint64_t lastestBlockHeight = this->storage->latest()->getNHeight();
+    this->db->put(std::string("latest"), Utils::uint64ToBytes(lastestBlockHeight), DBPrefix::evmHost);
+    DBBatch batch;
+    for (const auto& [address, account] : this->accounts) {
+      batch.push_back(address.asBytes(), account.code.first, DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
+      batch.push_back(address.asBytes(), account.codeHash.first.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
+      std::cout << "Dumping storage for: " << address.hex(true) << std::endl;
+      std::cout << "Storage size: " << account.storage.size() << std::endl;
+      for (const auto& [key, value] : account.storage) {
+        // Key for account storage will be address + key
+        // Vaue is value.first.asBytes()
+        Bytes keyBytes = address.asBytes();
+        Utils::appendBytes(keyBytes, key.asBytes());
+        batch.push_back(keyBytes, value.second.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
+      }
+    }
+
+    std::cout << "dumping contract addresses, size: " << this->contractAddresses.size() << std::endl;
+    for (const auto& [txHash, address] : this->contractAddresses) {
+      batch.push_back(txHash.asBytes(), address.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
+    }
+
+    this->db->putBatch(batch);
+  }
+
   evmc_vm* vm;
   const Storage* storage; // Pointer to the storage object
+  DB * const db; // Pointer to the DB object
+  const Options * const options; // Pointer to the options object
 
+  /**
+   * Internal variables for the EVMHost
+   * Variables that are saved to DB are the following
+   * Nonce and balance is handled by the State
+   * this->accounts
+   * Of the accounts we save:
+   *   - code (first)
+   *   - codeHash (first)
+   *   - storage (hash + first)
+   * contractAddresses
+   */
   std::unordered_map<Address, EVMAccount, SafeHash> accounts;
   std::vector<Address> accessedAccountsBalances;           // Used to know what accounts were accessed to commit or reverts
   std::vector<Address> accessedAccountsCode;                   // Used to know what accounts were accessed to commit or reverts
@@ -59,6 +150,10 @@ public:
 
   evmc_result createContract(const ethCallInfo& tx) {
     const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
+    if (from != this->options->getChainOwner()) {
+      throw std::runtime_error("Only the chain owner can create contracts");
+    }
+
     const auto contractAddress = deriveContractAddress(this->accounts[from].nonce.second, from);
     evmc_message creationMsg;
     creationMsg.kind = evmc_call_kind::EVMC_CREATE;
@@ -418,6 +513,7 @@ public:
         this->accounts[addr].code.first = this->accounts[addr].code.second;
         this->accounts[addr].codeHash.first = this->accounts[addr].codeHash.second;
       }
+      this->recentlyCreatedContracts.clear();
       this->accessedAccountsCode.clear();
     }
 

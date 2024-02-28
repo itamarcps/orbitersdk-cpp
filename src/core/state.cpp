@@ -15,7 +15,7 @@ State::State(
   const Options& options
 ) : db_(db), storage_(storage), p2pManager_(p2pManager), options_(options),
 rdpos_(db, storage, p2pManager, options, *this),
-contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evmHost_(this->evmone_, &this->storage_)
+contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evmHost_(this->evmone_, &this->storage_, &this->db_, &this->options_)
 {
   std::unique_lock lock(this->stateMutex_);
   auto accountsFromDB = db_.getBatch(DBPrefix::nativeAccounts);
@@ -53,9 +53,13 @@ contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evm
 
     this->evmHost_.accounts[Address(dbEntry.key)].balance.first = this->evmHost_.accounts[Address(dbEntry.key)].balance.second = balance;
     this->evmHost_.accounts[Address(dbEntry.key)].nonce.first = this->evmHost_.accounts[Address(dbEntry.key)].nonce.second = nonce;
+    std::cout << "Loaded balance for address: " << Address(dbEntry.key).hex(true) << " balance: " << balance.str() << " nonce: " << nonce << std::endl;
+    std::cout << "Stored: " << this->evmHost_.accounts[Address(dbEntry.key)].balance.second.str() << " nonce: " << this->evmHost_.accounts[Address(dbEntry.key)].nonce.second << std::endl;
   }
   auto latestBlock = this->storage_.latest();
   this->contractManager_.updateContractGlobals(Secp256k1::toAddress(latestBlock->getValidatorPubKey()), latestBlock->hash(), latestBlock->getNHeight(), latestBlock->getTimestamp());
+  this->evmHost_.commitBalance();
+  this->evmHost_.commitNonce();
 }
 
 State::~State() {
@@ -106,7 +110,14 @@ TxInvalid State::validateTransactionInternal(const TxBlock& tx) const {
   }
   auto accountIt = this->evmHost_.accounts.find(tx.getFrom());
   if (accountIt == this->evmHost_.accounts.end()) {
-    Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Account doesn't exist (0 balance and 0 nonce)");
+    Logger::logToDebug(LogType::ERROR, Log::state, __func__, "Account " + tx.getFrom().hex(true).get() + "doesn't exist (0 balance and 0 nonce)");
+    auto to = tx.getTo();
+    auto v = tx.getV();
+    auto r = tx.getR();
+    auto s = tx.getS();
+    // LogtoDebug to v r s
+      Logger::logToDebug(LogType::ERROR, Log::state, __func__, "v: " + std::to_string(v) + " r: " + Hex::fromBytes(Utils::uint256ToBytes(r) , true).get() + " s: " + Hex::fromBytes(Utils::uint256ToBytes(s) , true).get());
+      Logger::logToDebug( LogType::ERROR, Log::state, __func__, "to: " + to.hex(true).get());
     return TxInvalid::InvalidBalance;
   }
   const auto& accBalance = accountIt->second.balance.second;

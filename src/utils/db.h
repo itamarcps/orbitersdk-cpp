@@ -30,6 +30,7 @@ namespace DBPrefix {
   const Bytes contracts =       { 0x00, 0x06 }; ///< "contracts" = "0006"
   const Bytes contractManager = { 0x00, 0x07 }; ///< "contractManager" = "0007"
   const Bytes events =          { 0x00, 0x08 }; ///< "events" = "0008"
+  const Bytes evmHost =         { 0x00, 0x09 }; ///< "EVMHost" = "0009"
 };
 
 /// Struct for a database connection/endpoint.
@@ -156,6 +157,12 @@ class DB {
      * @return `true` if the database is closed successfully, `false` otherwise.
      */
     inline bool close() { delete this->db_; this->db_ = nullptr; return (this->db_ == nullptr); }
+
+    static Bytes makeNewPrefix(Bytes prefix, const std::string& newPrefix) {
+      prefix.reserve(prefix.size() + newPrefix.size());
+      prefix.insert(prefix.end(), newPrefix.cbegin(), newPrefix.cend());
+      return prefix;
+    }
 
     /**
      * Check if a key exists in the database.

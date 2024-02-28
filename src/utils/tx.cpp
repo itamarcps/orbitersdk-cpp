@@ -255,7 +255,7 @@ Bytes TxBlock::rlpSerialize(bool includeSig) const {
   total_size += (this->maxPriorityFeePerGas_ < 0x80) ? 1 : 1 + reqBytesMaxPriorityFeePerGas;
   total_size += (this->maxFeePerGas_ < 0x80) ? 1 : 1 + reqBytesMaxFeePerGas;
   total_size += (this->gasLimit_ < 0x80) ? 1 : 1 + reqBytesGasLimit;
-  total_size += 1 + (this->to_ == Address()) ? 1 : 20;
+  total_size += (this->to_ == Address()) ? 1 : 1 + 20;
   total_size += (this->value_ < 0x80) ? 1 : 1 + reqBytesValue;
   total_size += 1; // Access List
 
