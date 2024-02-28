@@ -13,7 +13,7 @@ else()
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/simulatorworker.cpp
     )
 
-    target_include_directories(network_sim_lib PRIVATE ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR})
+    target_include_directories(network_sim_lib PRIVATE ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR} orbitersdk_lib)
 
     target_link_libraries(network_sim_lib PRIVATE orbitersdk_lib
         ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
