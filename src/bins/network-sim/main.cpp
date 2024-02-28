@@ -216,7 +216,6 @@ int main() {
   std::cout << "Press anything to start the simulation..." << std::endl;
   std::cin.get();
 
-  return 0;
   simulator.run();
 
   return 0;
