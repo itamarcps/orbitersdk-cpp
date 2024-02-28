@@ -235,7 +235,7 @@ void rdPoS::signBlock(Block &block) {
 bool rdPoS::addValidatorTx(const TxValidator& tx) {
   std::unique_lock lock(this->mutex_);
   if (this->validatorMempool_.contains(tx.hash())) {
-    Logger::logToDebug(LogType::INFO, Log::rdPoS, __func__, "TxValidator already exists in mempool.");
+    // Logger::logToDebug(LogType::INFO, Log::rdPoS, __func__, "TxValidator already exists in mempool.");
     return true;
   }
 
