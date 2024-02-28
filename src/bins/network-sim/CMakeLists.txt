@@ -17,7 +17,7 @@ else()
 
     target_link_libraries(network_sim_lib PRIVATE orbitersdk_lib
         ${CRYPTOPP_LIBRARIES} ${SCRYPT_LIBRARY} Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
-        Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES}
+        Speedb ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} orbitersdk_lib
     )
 
       # Compile and link the ABI generator executable
