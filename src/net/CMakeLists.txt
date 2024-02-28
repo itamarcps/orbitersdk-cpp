@@ -1,5 +1,6 @@
 if(BUILD_AVALANCHEGO)
   set(NET_HEADERS
+    ${CMAKE_SOURCE_DIR}/src/net/http/httpclient.h
     ${CMAKE_SOURCE_DIR}/src/net/http/httpparser.h
     ${CMAKE_SOURCE_DIR}/src/net/http/httpsession.h
     ${CMAKE_SOURCE_DIR}/src/net/http/httplistener.h
@@ -19,6 +20,7 @@ if(BUILD_AVALANCHEGO)
   )
 
   set(NET_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/net/http/httpclient.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpparser.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpsession.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httplistener.cpp

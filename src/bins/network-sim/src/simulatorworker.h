@@ -1,7 +1,7 @@
 #ifndef SIMULATORWORKER_H
 #define SIMULATORWORKER_H
 
-#include "httpclient.h"
+#include "net/http/httpclient.h"
 #include "common.h"
 #include <atomic>
 

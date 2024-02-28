@@ -1,7 +1,7 @@
 #ifndef NETWORKSIMULATOR_H
 #define NETWORKSIMULATOR_H
 
-#include "httpclient.h"
+#include "net/http/httpclient.h"
 #include "common.h"
 #include "simulatorworker.h"
 

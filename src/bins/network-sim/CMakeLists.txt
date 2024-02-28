@@ -4,11 +4,9 @@ else()
   if (BUILD_NETWORK_SIM)
     add_library(network_sim_lib STATIC
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/common.h
-        ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/httpclient.h
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/networksimulator.h
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/simulatorworker.h
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/common.cpp
-        ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/httpclient.cpp
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/networksimulator.cpp
         ${CMAKE_SOURCE_DIR}/src/bins/network-sim/src/simulatorworker.cpp
     )
