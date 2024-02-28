@@ -28,9 +28,9 @@ void Utils::logToFile(std::string_view str) {
 }
 
 void Utils::safePrint(std::string_view str) {
-  if (!Utils::logToCout) return; // Never print if we are in a test
-  std::lock_guard lock(cout_mutex);
-  std::cout << str << std::endl;
+ // if (!Utils::logToCout) return; // Never print if we are in a test
+ // std::lock_guard lock(cout_mutex);
+ // std::cout << str << std::endl;
 }
 
 Hash Utils::sha3(const BytesArrView input) {
