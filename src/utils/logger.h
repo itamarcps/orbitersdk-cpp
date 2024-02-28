@@ -14,7 +14,7 @@ See the LICENSE.txt file in the project root for more information.
 #include <condition_variable>
 #include <future>
 
-/// Enum for the log message types.
+/// Enum for the // message types.
 enum class LogType { DEBUG, INFO, WARNING, ERROR };
 
 /// Namespace with string prefixes for each blockchain module, for printing log/debug messages.
@@ -152,11 +152,11 @@ class Logger {
 
     /// Post a task to the queue.
     void postLogTask(LogInfo&& infoToLog) noexcept {
-      {
-        std::unique_lock<std::mutex> lock(logQueueMutex_);
-        logQueue_.emplace(std::move(infoToLog));
-      }
-      cv_.notify_one();
+      //{
+      //  std::unique_lock<std::mutex> lock(logQueueMutex_);
+      //  logQueue_.emplace(std::move(infoToLog));
+      //}
+      //cv_.notify_one();
     };
 
   public:
