@@ -148,7 +148,7 @@ public:
   std::vector<std::array<uint8_t, 32>> m_ecrecover_results; // Used to store the results of ecrecover precompile (so we don't have a memory leak)
   mutable bool shouldRevert = false;                               // Used to know if we should revert or commit in the case of a exception inside any of the calls below
 
-  evmc_result createContract(const ethCallInfo& tx) {
+  evmc::Result createContract(const ethCallInfo& tx) {
     const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
     if (from != this->options->getChainOwner()) {
       throw std::runtime_error("Only the chain owner can create contracts");
@@ -167,9 +167,9 @@ public:
     creationMsg.code_address = {};
     creationMsg.flags = 0;
 
-    auto creationResult = evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+    auto creationResult = evmc::Result(evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &creationMsg,
-               fullData.data(), fullData.size());
+               fullData.data(), fullData.size()));
 
     if (creationResult.status_code) {
       std::cout << "Bad news! Contract creation failed, reason: " << evmc_status_code_to_string(creationResult.status_code) << std::endl;
@@ -188,7 +188,7 @@ public:
     return creationResult;
   }
 
-  evmc_result execute(const ethCallInfo& tx) {
+  evmc::Result execute(const ethCallInfo& tx) {
     const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
 
     if (to == Address()) {
@@ -207,9 +207,9 @@ public:
     msg.code_address = to.toEvmcAddress();
 
 
-    return evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+    return evmc::Result(evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &msg,
-                accounts[to].code.second.data(), accounts[to].code.second.size());
+                accounts[to].code.second.data(), accounts[to].code.second.size()));
   }
 
 
