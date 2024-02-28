@@ -49,6 +49,29 @@ class Event {
     bool anonymous_;            ///< Whether the event is anonymous or not (its signature is indexed and searchable).
 
   public:
+
+    /**
+     * Constructor with all parameters.
+     * @param name The event's name.
+     * @param logIndex The event's position on the block.
+     * @param txHash The hash of the transaction that emitted the event.
+     * @param txIndex The position of the transaction in the block.
+     * @param blockHash The hash of the block that emitted the event.
+     * @param blockIndex The height of the block.
+     * @param address The address that emitted the event.
+     * @param data The event's arguments.
+     * @param topics The event's indexed arguments.
+     * @param anonymous Whether the event is anonymous or not.
+     */
+    Event(const std::string& name, uint64_t logIndex, const Hash& txHash, uint64_t txIndex,
+          const Hash& blockHash, uint64_t blockIndex, Address address, const Bytes& data,
+          const std::vector<Hash>& topics, bool anonymous) :
+          name_(name), logIndex_(logIndex), txHash_(txHash), txIndex_(txIndex),
+          blockHash_(blockHash), blockIndex_(blockIndex), address_(address),
+          data_(data), topics_(topics), anonymous_(anonymous) {}
+
+
+
     /**
      * Constructor. Only sets data partially, setStateData() should be called
      * after creating a new Event so the rest of the data can be set.
@@ -258,6 +281,12 @@ class EventManager {
      * @param event The event to register.
      */
     void registerEvent(Event&& event) { this->tempEvents_.insert(std::move(event)); }
+
+    /**
+     * Forcefully register the event in the permanent list.
+     * @param event The event to register.
+     */
+    void commitEvent(Event&& event) { this->events_.insert(event); }
 
     /**
      * Actually register events in the permanent list.

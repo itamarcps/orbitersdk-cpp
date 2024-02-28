@@ -178,6 +178,27 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
       if (evmCallResult.status_code || this->evmHost_.shouldRevert) {
         throw DynamicException("Error when executing EVM contract, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
       }
+
+      // After running and everything ok but before committing, we need to register the events
+      {
+        for (uint64_t i = 0; i < this->evmHost_.emittedEvents.size(); i++) {
+          const auto& emittedEvent = this->evmHost_.emittedEvents[i];
+          Event sdkEvent = Event(
+            "",
+            i,
+            tx.hash(),
+            txIndex,
+            blockHash,
+            blockHeight,
+            emittedEvent.creator,
+            emittedEvent.data,
+            emittedEvent.topics,
+            false
+          );
+          std::cout << "Emitted events!" << std::endl;
+          this->contractManager_.commitEvent(std::move(sdkEvent));
+        }
+      }
       this->evmHost_.commit();
       this->evmHost_.commitCode();
     } catch (const std::exception& e) {

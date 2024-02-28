@@ -109,6 +109,11 @@ class ERC20 : public DynamicContract {
     /// Destructor.
     ~ERC20() override;
 
+    // event Transfer(address indexed from, address indexed to, uint256 value);
+    void Transfer(const EventParam<Address, true>& from, const EventParam<Address, true>& to, const EventParam<uint256_t, true>& value) {
+      this->emitEvent(__func__, std::make_tuple(from, to, value));
+    }
+
     /**
      * Get the name of the ERC20 token. Solidity counterpart:
      * function name() public view returns (string memory) { return name_; }
@@ -203,6 +208,9 @@ class ERC20 : public DynamicContract {
         std::make_tuple("approve", &ERC20::approve, FunctionTypes::NonPayable, std::vector<std::string>{"spender", "value"}),
         std::make_tuple("allowance", &ERC20::allowance, FunctionTypes::View, std::vector<std::string>{"owner", "spender"}),
         std::make_tuple("transferFrom", &ERC20::transferFrom, FunctionTypes::NonPayable, std::vector<std::string>{"from", "to", "value"})
+      );
+      ContractReflectionInterface::registerContractEvents<ERC20>(
+        std::make_tuple("Transfer", false, &ERC20::Transfer, std::vector<std::string>{"from", "to", "value"})
       );
     }
 };

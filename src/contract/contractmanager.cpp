@@ -263,6 +263,10 @@ const std::vector<Event> ContractManager::getEvents(
   return this->eventManager_.getEvents(txHash, blockIndex, txIndex);
 }
 
+void ContractManager::commitEvent(Event&& event) {
+  this->eventManager_.commitEvent(std::move(event));
+}
+
 void ContractManager::updateContractGlobals(
   const Address& coinbase, const Hash& blockHash,
   const uint64_t& blockHeight, const uint64_t& blockTimestamp

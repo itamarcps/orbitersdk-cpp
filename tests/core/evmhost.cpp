@@ -64,6 +64,10 @@ namespace TERC20 {
         finalOwnerNonce = sdk.getNativeNonce(sdk.getChainOwnerAccount().address);
         std::cout << "test ownerBalanceAfter: " << finalRecipientTokenBal << std::endl;
         std::cout << "test toBalance: " << finalRecipientTokenBal << std::endl;
+        // Let's see if we can find the transfer event!
+        auto events = sdk.getEventsEmittedByAddress(ERC20Address, &ERC20::Transfer);
+        REQUIRE(events.size() == 2);  // mint is also called on the constructor which calls an event to be emmited
+
       }
       std::cout << "dump to DB successfull" << std::endl;
 

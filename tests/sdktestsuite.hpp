@@ -773,7 +773,13 @@ class SDKTestSuite {
       std::vector<Event> filteredEvents;
       // Specifically filter events from the most recent 2000 blocks
       uint64_t lastBlock = this->storage_.latest()->getNHeight();
-      uint64_t firstBlock = (lastBlock - 2000 >= 0) ? lastBlock - 2000 : 0;
+      uint64_t firstBlock;
+      if (lastBlock < 2000) {
+        firstBlock = 0;
+      } else {
+        lastBlock = firstBlock - 2000;
+      }
+      std::cout << "firstBlock: " << firstBlock << " lastBlock: " << lastBlock << std::endl;
       auto allEvents = this->getEvents(firstBlock, lastBlock, address, {});
 
       // Filter the events by the topics
@@ -826,7 +832,12 @@ class SDKTestSuite {
       // Filter the events by the topics, from the most recent 2000 blocks
       std::vector<Event> filteredEvents;
       uint64_t lastBlock = this->storage_.latest()->getNHeight();
-      uint64_t firstBlock = (lastBlock > 2000) ? lastBlock - 2000 : 0;
+      uint64_t firstBlock;
+      if (lastBlock < 2000) {
+        firstBlock = 0;
+      } else {
+        lastBlock = firstBlock - 2000;
+      }
       auto allEvents = this->getEvents(firstBlock, lastBlock, address, {});
       for (const auto& event : allEvents) {
         if (topicsToFilter.size() == 0) {

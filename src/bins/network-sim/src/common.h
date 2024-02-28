@@ -3,6 +3,7 @@
 
 #include "../../../utils/utils.h"
 #include "../../../utils/tx.h"
+#include <boost/algorithm/string.hpp>
 
 struct WorkerAccount {
   const PrivKey privKey;

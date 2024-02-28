@@ -32,6 +32,12 @@ struct EVMAccount {
   std::unordered_map<Hash, Hash, SafeHash> transientStorage; ///< Account transient storage.
 };
 
+struct EVMEvent {
+  Address creator;
+  Bytes data;
+  std::vector<Hash> topics;
+};
+
 
 /*
  * Class for the EVMHost
@@ -146,6 +152,7 @@ public:
   evmc_tx_context currentTxContext = {};                   // Current transaction context
   Hash currentTxHash;                                      // Current transaction hash
   std::vector<std::array<uint8_t, 32>> m_ecrecover_results; // Used to store the results of ecrecover precompile (so we don't have a memory leak)
+  std::vector<EVMEvent> emittedEvents;                     // Used to store the emitted events by current call
   mutable bool shouldRevert = false;                               // Used to know if we should revert or commit in the case of a exception inside any of the calls below
 
   evmc::Result createContract(const ethCallInfo& tx) {
@@ -437,6 +444,12 @@ public:
 
     void emit_log(const evmc::address& addr, const uint8_t* data, size_t data_size, const evmc::bytes32 topics[], size_t topics_count) noexcept override {
       // TODO: Implement after integrating with state
+      try {
+        this->emittedEvents.push_back({addr, Bytes(data, data + data_size), {topics, topics + topics_count}});
+      } catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        this->shouldRevert = true;
+      }
     }
 
     evmc_access_status access_account(const evmc::address& addr) noexcept override {
@@ -492,6 +505,7 @@ public:
       this->accessedStorages.clear();
       this->accessedTransients.clear();
       this->currentTxHash = Hash();
+      this->emittedEvents.clear();
     }
 
     void commitBalance() {
@@ -552,6 +566,7 @@ public:
       this->accessedTransients.clear();
       this->recentlyCreatedContracts.clear();
       this->currentTxHash = Hash();
+      this->emittedEvents.clear();
     }
 };
 

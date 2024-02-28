@@ -244,6 +244,12 @@ class ContractManager : public BaseContract {
       const Hash& txHash, const uint64_t& blockIndex, const uint64_t& txIndex
     ) const;
 
+     /**
+     * Forcefully register and EVMHost event in the event manager.
+     * @param event The event to register.
+     */
+     void commitEvent(Event&& event);
+
     /**
      * Update the ContractGlobals variables
      * Used by the State (when processing a block) to update the variables.
