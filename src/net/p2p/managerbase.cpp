@@ -10,10 +10,10 @@ See the LICENSE.txt file in the project root for more information.
 namespace P2P {
 
   bool ManagerBase::registerSessionInternal(const std::shared_ptr<Session>& session) {
-    std::unique_lock lockSession(this->sessionsMutex_); // ManagerBase::registerSessionInternal can change sessions_ map.
-    if (!this->started_) {
+    if (this->closed_) {
       return false;
     }
+    std::unique_lock lockSession(this->sessionsMutex_); // ManagerBase::registerSessionInternal can change sessions_ map.
     // The NodeID of a session is made by the host IP and his server port.
     // That means, it is possible for us to receive a inbound connection for someone that we already have a outbound connection.
     // In this case, we will keep the oldest connection alive and close the new one.
@@ -31,10 +31,10 @@ namespace P2P {
   }
 
   bool ManagerBase::unregisterSessionInternal(const std::shared_ptr<Session> &session) {
-    std::unique_lock lockSession(this->sessionsMutex_); // ManagerBase::unregisterSessionInternal can change sessions_ map.
-    if (!this->started_) {
+    if (this->closed_) {
       return false;
     }
+    std::unique_lock lockSession(this->sessionsMutex_); // ManagerBase::unregisterSessionInternal can change sessions_ map.
     if (!sessions_.contains(session->hostNodeId())) {
       lockSession.unlock(); // Unlock before calling logToDebug to avoid waiting for the lock in the logToDebug function.
       Logger::logToDebug(LogType::ERROR, Log::P2PManager, __func__, "Session does not exist at " +
@@ -47,9 +47,6 @@ namespace P2P {
 
   bool ManagerBase::disconnectSessionInternal(const NodeID& nodeId) {
     std::unique_lock lockSession(this->sessionsMutex_); // ManagerBase::disconnectSessionInternal can change sessions_ map.
-    if (!this->started_) {
-      return false;
-    }
     if (!sessions_.contains(nodeId)) {
       lockSession.unlock(); // Unlock before calling logToDebug to avoid waiting for the lock in the logToDebug function.
       Logger::logToDebug(LogType::ERROR, Log::P2PManager, __func__, "Session does not exist at " + nodeId.first.to_string() + ":" + std::to_string(nodeId.second));
@@ -63,7 +60,7 @@ namespace P2P {
   }
 
   std::shared_ptr<Request> ManagerBase::sendRequestTo(const NodeID &nodeId, const std::shared_ptr<const Message>& message) {
-    if (!this->started_) return nullptr;
+    if (this->closed_) return nullptr;
     std::shared_lock<std::shared_mutex> lockSession(this->sessionsMutex_); // ManagerBase::sendRequestTo doesn't change sessions_ map.
     if(!sessions_.contains(nodeId)) {
       lockSession.unlock(); // Unlock before calling logToDebug to avoid waiting for the lock in the logToDebug function.
@@ -87,30 +84,24 @@ namespace P2P {
 
   // ManagerBase::answerSession doesn't change sessions_ map, but we still need to
   // be sure that the session io_context doesn't get deleted while we are using it.
-  void ManagerBase::answerSession(const NodeID &nodeId, const std::shared_ptr<const Message>& message) {
-    std::shared_lock lockSession(this->sessionsMutex_);
-    if (!this->started_) return;
-    auto it = sessions_.find(nodeId);
-    if (it == sessions_.end()) {
-      Logger::logToDebug(LogType::ERROR, Log::P2PManager, __func__, "Cannot find session for " + nodeId.first.to_string() + ":" + std::to_string(nodeId.second));
-      return;
+  void ManagerBase::answerSession(std::weak_ptr<Session> session, const std::shared_ptr<const Message>& message) {
+    if (this->closed_) return;
+    std::shared_lock<std::shared_mutex> lockSession(this->sessionsMutex_);
+    if (auto ptr = session.lock()) {
+      ptr->write(message);
+    } else {
+      Logger::logToDebug(LogType::ERROR, Log::P2PManager, __func__, "Session is no longer valid");
     }
-    it->second->write(message);
   }
 
   void ManagerBase::start() {
-    std::scoped_lock lock(this->stateMutex_);
-    if (this->started_) return;
-    this->started_ = true;
-    this->threadPool_ = std::make_unique<BS::thread_pool_light>(4);
+    this->closed_ = false;
     this->server_.start();
     this->clientfactory_.start();
   }
 
   void ManagerBase::stop() {
-    std::scoped_lock lock(this->stateMutex_);
-    if (! this->started_) return;
-    this->started_ = false;
+    this->closed_ = true;
     {
       std::unique_lock lock(this->sessionsMutex_);
       for (auto it = sessions_.begin(); it != sessions_.end();) {
@@ -119,16 +110,9 @@ namespace P2P {
         if (auto sessionPtr = session.lock()) sessionPtr->close();
       }
     }
+    this->threadPool_.wait_for_tasks();
     this->server_.stop();
     this->clientfactory_.stop();
-    this->threadPool_.reset();
-  }
-
-  void ManagerBase::asyncHandleMessage(const NodeID &nodeId, const std::shared_ptr<const Message> message) {
-    std::shared_lock lock(this->stateMutex_);
-    if (this->threadPool_) {
-      this->threadPool_->push_task(&ManagerBase::handleMessage, this, nodeId, message);
-    }
   }
 
   std::vector<NodeID> ManagerBase::getSessionsIDs() const {
@@ -158,7 +142,7 @@ namespace P2P {
   }
 
   void ManagerBase::connectToServer(const boost::asio::ip::address& address, uint16_t port) {
-    if (!this->started_) return;
+    if (this->closed_) return;
     if (address == this->server_.getLocalAddress() && port == this->serverPort_) return; /// Cannot connect to itself.
     {
       std::shared_lock<std::shared_mutex> lock(this->sessionsMutex_);
