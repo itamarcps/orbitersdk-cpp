@@ -31,6 +31,12 @@ namespace Faucet {
       worker.nonce = Hex(json["result"].get<std::string>()).getUint();
     }
     std::cout << "Nonces received!" << std::endl;
+
+    // Create the HTTP Sessions (128 sessions in total...)
+    for (size_t i = 0; i < 128; i++) {
+      this->clients_.emplace_back(this->httpEndpoint_.first.to_string(), std::to_string(this->httpEndpoint_.second));
+      this->clients_.back().connect();
+    }
   }
 
   void Manager::run() {
@@ -72,19 +78,21 @@ namespace Faucet {
       Utils::safePrint("Dripping to address: " + address.hex(true).get());
 
       WorkerAccount* worker = nullptr;
+      HTTPSyncClient* client = nullptr;
       {
         std::lock_guard lock(this->lastIndexMutex_);
-        Utils::safePrint("Dripping at index: " + std::to_string(this->lastIndex_));
+        Utils::safePrint("Dripping at index: " + std::to_string(this->lastIndex_) + " with server index: " + std::to_string(this->httpServerIndex_));
+
         worker = &this->faucetWorkers_[this->lastIndex_];
+        client = &this->clients_[this->httpServerIndex_];
         this->lastIndex_ = (this->lastIndex_ + 1) % this->faucetWorkers_.size();
+        this->httpServerIndex_ = (this->httpServerIndex_ + 1) % this->clients_.size();
       }
       // After getting the account, we can lock it and then use it for the drip operation.
       std::lock_guard lock(worker->inUse_);
 
       auto txRequest = createTransactions(*worker, 1000000000000000000, this->chainId_, address);
-      HTTPSyncClient client(this->httpEndpoint_.first.to_string(), std::to_string(this->httpEndpoint_.second));
-      client.connect();
-      auto response = client.makeHTTPRequest(txRequest);
+      auto response = client->makeHTTPRequest(txRequest);
       auto json = json::parse(response);
       if (json.contains("error")) {
         throw std::runtime_error("Error while sending transactions: sent: " + txRequest + " received: " + json.dump());
@@ -94,7 +102,7 @@ namespace Faucet {
       std::pair<Hash, bool> txConfirm(Hex::toBytes(json["result"].get<std::string>()), false);
       while (txConfirm.second == false) {
         std::this_thread::sleep_for(std::chrono::microseconds(10));
-        response = client.makeHTTPRequest(makeRequestMethod("eth_getTransactionReceipt", json::array({txConfirm.first.hex(true).get()})));
+        response = client->makeHTTPRequest(makeRequestMethod("eth_getTransactionReceipt", json::array({txConfirm.first.hex(true).get()})));
         json = json::parse(response);
         if (json.contains("error")) {
           throw std::runtime_error("Error while confirming transactions: sent: " + txRequest + " received: " + json.dump());

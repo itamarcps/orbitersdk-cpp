@@ -32,8 +32,10 @@ namespace Faucet {
       const uint16_t port_; // Port to be used for the server
       std::mutex lastIndexMutex_;
       uint64_t lastIndex_ = 0;
+      uint64_t httpServerIndex_ = 0;
       std::shared_mutex accountsMutex_;
       std::unordered_set<Address, SafeHash> accounts_;
+      std::vector<HTTPSyncClient> clients_;
     public:
 
       Manager(
