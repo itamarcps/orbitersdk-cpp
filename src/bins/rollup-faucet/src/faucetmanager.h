@@ -41,13 +41,14 @@ namespace Faucet {
         const uint64_t& chainId,
         const std::pair<net::ip::address_v4, uint16_t>& httpEndpoint,
         const uint16_t& port
-      ) : faucetWorkers_(faucetWorkers), chainId_(chainId), httpEndpoint_(httpEndpoint), port_(port), server_(port, *this), threadPool_(8) {}
+      ) : faucetWorkers_(faucetWorkers), chainId_(chainId), httpEndpoint_(httpEndpoint), port_(port), server_(port, *this), threadPool_(2048) {}
 
       Manager(const Manager& other) = delete;
       Manager& operator=(const Manager& other) = delete;
       Manager(Manager&& other) = delete;
       Manager& operator=(Manager&& other) = delete;
 
+      static std::string makeDripToAddress(const Address& address);
 
       // Make a new "send" tx. return json string eth_sendRawTransaction
       static std::string createTransactions(WorkerAccount& account,

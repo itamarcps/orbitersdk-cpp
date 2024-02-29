@@ -12,6 +12,9 @@ std::string makeRequestMethod(const std::string& method, const T& params) {
 
 namespace Faucet {
 
+  std::string Manager::makeDripToAddress(const Address& address) {
+    return makeRequestMethod("dripToAddress", json::array({address.hex(true).get()}));
+  }
 
   void Manager::setup() {
     std::cout << "Setting up the faucet manager" << std::endl;
@@ -71,6 +74,7 @@ namespace Faucet {
       WorkerAccount* worker = nullptr;
       {
         std::lock_guard lock(this->lastIndexMutex_);
+        Utils::safePrint("Dripping at index: " + std::to_string(this->lastIndex_));
         worker = &this->faucetWorkers_[this->lastIndex_];
         this->lastIndex_ = (this->lastIndex_ + 1) % this->faucetWorkers_.size();
       }
@@ -85,8 +89,27 @@ namespace Faucet {
       if (json.contains("error")) {
         throw std::runtime_error("Error while sending transactions: sent: " + txRequest + " received: " + json.dump());
       }
+      /// Sleep for 3 seconds to allow the chain to move...
+      std::this_thread::sleep_for(std::chrono::microseconds(500));
+      std::pair<Hash, bool> txConfirm(Hex::toBytes(json["result"].get<std::string>()), false);
+      while (txConfirm.second == false) {
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+        response = client.makeHTTPRequest(makeRequestMethod("eth_getTransactionReceipt", json::array({txConfirm.first.hex(true).get()})));
+        json = json::parse(response);
+        if (json.contains("error")) {
+          throw std::runtime_error("Error while confirming transactions: sent: " + txRequest + " received: " + json.dump());
+        }
+        if (json["result"].is_null()) {
+          continue;
+        }
+        Utils::safePrint("Transaction confirmed: " + txConfirm.first.hex(true).get());
+        txConfirm.second = true;
+      }
       worker->nonce++;
+
     } catch (std::exception& e) {
+      std::unique_lock lock(this->accountsMutex_);
+      this->accounts_.erase(address);
       Logger::logToDebug(LogType::ERROR, "FaucetManager", __func__,
         std::string("Error while processing dripToAddress: ") + e.what()
       );

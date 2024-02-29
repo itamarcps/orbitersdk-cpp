@@ -34,4 +34,13 @@ else()
     target_link_libraries(rollup-faucet
             orbitersdk_lib rollup_faucet_lib Speedb ${SNAPPY_LIBRARY} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
     )
+
+    # Compile and link the rollup-faucet executable
+    add_executable(rollup-tester "main-tester.cpp")
+
+    add_dependencies(rollup-tester orbitersdk_lib rollup_faucet_lib)
+    target_include_directories(rollup-tester PRIVATE orbitersdk_lib rollup_faucet_lib ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(rollup-tester
+            orbitersdk_lib rollup_faucet_lib Speedb ${SNAPPY_LIBRARY} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} Secp256k1 Ethash ${ETHASH_BYPRODUCTS}
+    )
 endif()
