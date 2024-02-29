@@ -34,8 +34,8 @@ namespace Faucet {
 
     // Create the HTTP Sessions (128 sessions in total...)
     for (size_t i = 0; i < 128; i++) {
-      this->clients_.emplace_back(this->httpEndpoint_.first.to_string(), std::to_string(this->httpEndpoint_.second));
-      this->clients_.back().connect();
+      this->clients_.emplace_back(std::make_unique<HTTPSyncClient>(this->httpEndpoint_.first.to_string(), std::to_string(this->httpEndpoint_.second)));
+      this->clients_.back()->connect();
     }
   }
 
@@ -84,7 +84,7 @@ namespace Faucet {
         Utils::safePrint("Dripping at index: " + std::to_string(this->lastIndex_) + " with server index: " + std::to_string(this->httpServerIndex_));
 
         worker = &this->faucetWorkers_[this->lastIndex_];
-        client = &this->clients_[this->httpServerIndex_];
+        client = this->clients_[this->httpServerIndex_].get();
         this->lastIndex_ = (this->lastIndex_ + 1) % this->faucetWorkers_.size();
         this->httpServerIndex_ = (this->httpServerIndex_ + 1) % this->clients_.size();
       }

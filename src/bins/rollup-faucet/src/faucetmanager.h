@@ -35,7 +35,7 @@ namespace Faucet {
       uint64_t httpServerIndex_ = 0;
       std::shared_mutex accountsMutex_;
       std::unordered_set<Address, SafeHash> accounts_;
-      std::vector<HTTPSyncClient> clients_;
+      std::vector<std::unique_ptr<HTTPSyncClient>> clients_;
     public:
 
       Manager(
