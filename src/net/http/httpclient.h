@@ -23,7 +23,6 @@ class HTTPSyncClient {
     boost::asio::io_context ioc;
     tcp::resolver resolver;
     beast::tcp_stream stream;
-    std::mutex mutex;
 
   public:
     HTTPSyncClient(const std::string& host, const std::string& port);

@@ -45,8 +45,6 @@ std::string HTTPSyncClient::makeHTTPRequest(
   req.body() = reqBody;
   req.prepare_payload();
 
-  std::unique_lock lock(this->mutex);
-
   // Send the HTTP request to the remote host
   http::write(stream, req, ec);
   if (ec) {

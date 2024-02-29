@@ -11,6 +11,102 @@ std::string makeRequestMethod(const std::string& method, const T& params) {
 
 
 namespace Faucet {
+  bool FaucetWorker::run() {
+    while(!this->stop_) {
+      try {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::unique_ptr<std::vector<Address>> dripQueue;
+        {
+          std::unique_lock lock(this->manager_.dripMutex_);
+          if (this->manager_.dripQueue_ == nullptr) {
+            Utils::safePrint("No more addresses to drip to, sleeping for 100ms");
+            continue;
+          }
+          dripQueue = std::move(this->manager_.dripQueue_);
+          // If the dripQueue is bigger than the number of accounts
+          // We can only process the amount of accounts available in the Manager::faucetWorkers_.size()
+          // Meaning the remaining accounts needs to be replaced back into the queue.
+          if (dripQueue->size() > this->manager_.faucetWorkers_.size()) {
+            this->manager_.dripQueue_ = std::make_unique<std::vector<Address>>(dripQueue->begin() + this->manager_.faucetWorkers_.size(), dripQueue->end());
+            // Resize the dripQueue to the size of the number of accounts
+            dripQueue->resize(this->manager_.faucetWorkers_.size());
+          } else {
+            this->manager_.dripQueue_ = nullptr;
+          }
+          Utils::safePrint("Dripping to " + std::to_string(dripQueue->size()) + " addresses");
+        }
+
+        std::vector<std::string> sendTxPackets;
+        std::vector<std::pair<Hash, bool>> sendTxHashes;
+        for (uint64_t i = 0; i < dripQueue->size(); ++i) {
+          const auto& address = dripQueue->at(i);
+          Utils::safePrint("Dripping to address: " + address.hex(true).get());
+          sendTxPackets.emplace_back(this->manager_.createTransactions(
+            this->manager_.faucetWorkers_[i],
+            1000000000000000000,
+            this->manager_.chainId_,
+            address
+          ));
+
+        }
+
+        Utils::safePrint("Sending " + std::to_string(sendTxPackets.size()) + " faucet transactions to the network");
+
+        for (auto& tx : sendTxPackets) {
+          std::this_thread::sleep_for(std::chrono::microseconds(3));
+          auto response = this->client_.makeHTTPRequest(tx);
+          auto json = json::parse(response);
+          if (json.contains("error")) {
+            throw std::runtime_error("Error while sending transactions: sent: " + tx + " received: " + json.dump());
+          }
+          sendTxHashes.emplace_back(Hex::toBytes(json["result"].get<std::string>()), false);
+        }
+
+        Utils::safePrint("Confirming " + std::to_string(sendTxHashes.size()) + " faucet transactions to the network");
+
+        for (uint64_t i = 0; i < sendTxHashes.size(); ++i) {
+          while (sendTxHashes[i].second == false) {
+            std::this_thread::sleep_for(std::chrono::microseconds(3));
+            auto response = this->client_.makeHTTPRequest(makeRequestMethod("eth_getTransactionReceipt", json::array({sendTxHashes[i].first.hex(true).get()})));
+            auto json = json::parse(response);
+            if (json.contains("error")) {
+              throw std::runtime_error("Error while confirming transactions: sent: " + sendTxHashes[i].first.hex(true).get() + " received: " + json.dump());
+            }
+            if (json["result"].is_null()) {
+              continue;
+            }
+            sendTxHashes[i].second = true;
+            this->manager_.faucetWorkers_[i].nonce += 1;
+          }
+        }
+        // Update nonce
+      } catch (std::exception& e) {
+        Utils::safePrint("Error while processing dripToAddress: " + std::string(e.what()));
+        Logger::logToDebug(LogType::ERROR, "FaucetManager", __func__,
+          std::string("Error while processing dripToAddress: ") + e.what()
+        );
+      }
+    }
+    return true;
+  }
+
+  void FaucetWorker::start() {
+    this->stop_ = false;
+    if (this->runFuture_.valid()) {
+      throw std::runtime_error("FaucetWorker already running");
+    }
+    this->runFuture_ = std::async(std::launch::async, &FaucetWorker::run, this);
+  }
+
+  void FaucetWorker::stop() {
+    if (!this->runFuture_.valid()) {
+      throw std::runtime_error("FaucetWorker not running");
+    }
+    this->stop_ = true;
+    this->runFuture_.get();
+  }
+
+
 
   std::string Manager::makeDripToAddress(const Address& address) {
     return makeRequestMethod("dripToAddress", json::array({address.hex(true).get()}));
@@ -31,16 +127,11 @@ namespace Faucet {
       worker.nonce = Hex(json["result"].get<std::string>()).getUint();
     }
     std::cout << "Nonces received!" << std::endl;
-
-    // Create the HTTP Sessions (128 sessions in total...)
-    for (size_t i = 0; i < 128; i++) {
-      this->clients_.emplace_back(std::make_unique<HTTPSyncClient>(this->httpEndpoint_.first.to_string(), std::to_string(this->httpEndpoint_.second)));
-      this->clients_.back()->connect();
-    }
   }
 
   void Manager::run() {
     std::cout << "Running faucet service..." << std::endl;
+    this->faucetWorker_.start();
     this->server_.run();
   }
 
@@ -67,65 +158,12 @@ namespace Faucet {
 
   void Manager::processDripToAddress(const Address& address) {
     // Firstly, lock the current state and check if existed, then grab the current worker account and move the index.
-    try {
-      {
-        std::unique_lock lock(this->accountsMutex_);
-        if (this->accounts_.contains(address)) {
-          throw DynamicException("Address already dripped");
-        }
-        this->accounts_.insert(address);
-      }
-      Utils::safePrint("Dripping to address: " + address.hex(true).get());
-
-      WorkerAccount* worker = nullptr;
-      HTTPSyncClient* client = nullptr;
-      {
-        std::lock_guard lock(this->lastIndexMutex_);
-        Utils::safePrint("Dripping at index: " + std::to_string(this->lastIndex_) + " with server index: " + std::to_string(this->httpServerIndex_));
-
-        worker = &this->faucetWorkers_[this->lastIndex_];
-        client = this->clients_[this->httpServerIndex_].get();
-        this->lastIndex_ = (this->lastIndex_ + 1) % this->faucetWorkers_.size();
-        this->httpServerIndex_ = (this->httpServerIndex_ + 1) % this->clients_.size();
-      }
-      // After getting the account, we can lock it and then use it for the drip operation.
-      std::lock_guard lock(worker->inUse_);
-
-      auto txRequest = createTransactions(*worker, 1000000000000000000, this->chainId_, address);
-      auto response = client->makeHTTPRequest(txRequest);
-      auto json = json::parse(response);
-      if (json.contains("error")) {
-        throw std::runtime_error("Error while sending transactions: sent: " + txRequest + " received: " + json.dump());
-      }
-      /// Sleep for 3 seconds to allow the chain to move...
-      std::this_thread::sleep_for(std::chrono::microseconds(500));
-      std::pair<Hash, bool> txConfirm(Hex::toBytes(json["result"].get<std::string>()), false);
-      while (txConfirm.second == false) {
-        std::this_thread::sleep_for(std::chrono::microseconds(10));
-        response = client->makeHTTPRequest(makeRequestMethod("eth_getTransactionReceipt", json::array({txConfirm.first.hex(true).get()})));
-        json = json::parse(response);
-        if (json.contains("error")) {
-          throw std::runtime_error("Error while confirming transactions: sent: " + txRequest + " received: " + json.dump());
-        }
-        if (json["result"].is_null()) {
-          continue;
-        }
-        Utils::safePrint("Transaction confirmed: " + txConfirm.first.hex(true).get());
-        txConfirm.second = true;
-      }
-      worker->nonce++;
-
-    } catch (std::exception& e) {
-      std::unique_lock lock(this->accountsMutex_);
-      this->accounts_.erase(address);
-      Logger::logToDebug(LogType::ERROR, "FaucetManager", __func__,
-        std::string("Error while processing dripToAddress: ") + e.what()
-      );
+    std::unique_lock lock(this->dripMutex_);
+    if (this->dripQueue_ == nullptr) {
+      this->dripQueue_ = std::make_unique<std::vector<Address>>();
     }
-
+    this->dripQueue_->emplace_back(address);
   }
-
-
 
   void Manager::dripToAddress(const Address& address) {
     this->threadPool_.push_task(&Manager::processDripToAddress, this, address);
