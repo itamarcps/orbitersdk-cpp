@@ -20,8 +20,8 @@ if(BUILD_AVALANCHEGO)
   )
 
   set(NET_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/net/http/httpclient.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpparser.cpp
+    ${CMAKE_SOURCE_DIR}/src/net/http/httpclient.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpsession.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httplistener.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpserver.cpp
@@ -42,6 +42,7 @@ else()
     ${CMAKE_SOURCE_DIR}/src/net/http/httpparser.h
     ${CMAKE_SOURCE_DIR}/src/net/http/httpsession.h
     ${CMAKE_SOURCE_DIR}/src/net/http/httplistener.h
+    ${CMAKE_SOURCE_DIR}/src/net/http/httpclient.h
     ${CMAKE_SOURCE_DIR}/src/net/http/httpserver.h
     ${CMAKE_SOURCE_DIR}/src/net/http/jsonrpc/methods.h
     ${CMAKE_SOURCE_DIR}/src/net/http/jsonrpc/encoding.h
@@ -61,6 +62,7 @@ else()
     ${CMAKE_SOURCE_DIR}/src/net/http/httpparser.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpsession.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httplistener.cpp
+    ${CMAKE_SOURCE_DIR}/src/net/http/httpclient.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/httpserver.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/jsonrpc/encoding.cpp
     ${CMAKE_SOURCE_DIR}/src/net/http/jsonrpc/decoding.cpp

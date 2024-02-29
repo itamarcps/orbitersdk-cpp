@@ -2,7 +2,21 @@ if(BUILD_AVALANCHEGO)
 
 else()
     add_library(rollup_faucet_lib STATIC
-            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/tmp.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/jsonrpc/encoding.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/jsonrpc/decoding.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/jsonrpc/encoding.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/jsonrpc/decoding.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httplistener.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httpparser.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httpserver.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httpsession.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/faucetmanager.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httplistener.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httpparser.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httpserver.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/httpsession.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-faucet/src/faucetmanager.cpp
+
     )
 
     target_include_directories(rollup_faucet_lib PRIVATE ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR} orbitersdk_lib)

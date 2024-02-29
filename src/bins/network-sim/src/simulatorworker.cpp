@@ -11,7 +11,6 @@ SimulatorWorker::SimulatorWorker(
     chainId_(chainId),
     txNativeBalance_(txNativeBalance) {}
 
-
 /// Create a number of transactions based on the number of accounts
 std::vector<std::string> SimulatorWorker::createTransactions(std::vector<WorkerAccount>& accounts,
                                const uint256_t& txNativeBalance,
