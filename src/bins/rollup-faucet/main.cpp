@@ -76,11 +76,11 @@ int main() {
     }
   }
 
-  std::cout << "Please provide the port for the server (empty for default: 37734): " << std::endl;
+  std::cout << "Please provide the port for the server (empty for default: 28888): " << std::endl;
   std::string portStr;
   std::getline(std::cin, portStr);
   if (portStr.empty()) {
-    port = 37734;
+    port = 28888;
   } else {
     for (const auto& c : portStr) {
       if (!std::isdigit(c)) {
