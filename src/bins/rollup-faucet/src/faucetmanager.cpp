@@ -13,13 +13,17 @@ std::string makeRequestMethod(const std::string& method, const T& params) {
 namespace Faucet {
   bool FaucetWorker::run() {
     while(!this->stop_) {
+      bool log = true;
       try {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::unique_ptr<std::vector<Address>> dripQueue;
         {
           std::unique_lock lock(this->manager_.dripMutex_);
           if (this->manager_.dripQueue_ == nullptr) {
-            Utils::safePrint("No more addresses to drip to, sleeping for 100ms");
+            if (log) {
+              Utils::safePrint("No more addresses to drip to, sleeping for 100ms");
+              log = false;
+            }
             continue;
           }
           dripQueue = std::move(this->manager_.dripQueue_);
