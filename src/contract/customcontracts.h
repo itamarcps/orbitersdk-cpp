@@ -18,10 +18,11 @@ See the LICENSE.txt file in the project root for more information.
 #include "templates/throwtestC.h"
 #include "templates/erc721test.h"
 #include "templates/testThrowVars.h"
+#include "templates/erc721mint.h"
 
 /// Typedef for the blockchain's registered contracts.
 using ContractTypes = std::tuple<
   ERC20, ERC20Wrapper, NativeWrapper, SimpleContract, DEXV2Pair, DEXV2Factory,
-  DEXV2Router02, ERC721, ThrowTestA, ThrowTestB, ThrowTestC, ERC721Test, TestThrowVars
+  DEXV2Router02, ERC721, ThrowTestA, ThrowTestB, ThrowTestC, ERC721Test, TestThrowVars, ERC721Mint
 >;
 

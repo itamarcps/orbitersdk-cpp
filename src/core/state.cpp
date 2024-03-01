@@ -143,7 +143,7 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
       uint256_t gasUsed = tx.getGasLimit() - uint256_t(gasLeft);
       balance -= gasUsed * tx.getMaxFeePerGas();
       if (evmCallResult.status_code || this->evmHost_.shouldRevert) {
-        throw DynamicException("Error when executing EVM contract, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+        throw DynamicException("Error when executing EVM contract, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)) + " bytes: " + Hex::fromBytes(Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size)).get());
       }
 
       // After running and everything ok but before committing, we need to register the events
@@ -437,7 +437,7 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
       this->evmHost_.revertBalance();
 
       if (evmCallResult.status_code) {
-        throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+        throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)) + " bytes: " + Hex::fromBytes(Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size)).get());
       }
       return Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size);
     }
@@ -497,7 +497,7 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
     this->evmHost_.revertBalance();
 
     if (evmCallResult.status_code) {
-      throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)));
+      throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)) + " bytes: " + Hex::fromBytes(Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size)).get());
     }
     auto gasUsed = gasLimit - evmCallResult.gas_left;
     return gasUsed + baseGas;

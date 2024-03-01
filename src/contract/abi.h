@@ -243,6 +243,7 @@ namespace ABI {
     template<> struct TypeName<int248_t> { static std::string get() { return "int248"; }};
     template<> struct TypeName<int256_t> { static std::string get() { return "int256"; }};
 
+    template<> struct TypeName<Hash> { static std::string get() { return "bytes32"; }};
     template<> struct TypeName<Address> { static std::string get() { return "address"; }};
     template<> struct TypeName<bool> { static std::string get() { return "bool"; }};
     template<> struct TypeName<Bytes> { static std::string get() { return "bytes"; }};
@@ -399,6 +400,7 @@ namespace ABI {
     // Specialization for default solidity types
     template <> struct TypeEncoder<Address> { static Bytes encode(const Address& add) { return Utils::padLeftBytes(add.get(), 32); }};
     template <> struct TypeEncoder<bool> { static Bytes encode(const bool& b) { return Utils::padLeftBytes((b ? Bytes{0x01} : Bytes{0x00}), 32); }};
+    template <> struct TypeEncoder<Hash> { static Bytes encode(const Hash& h) { return Bytes(h.cbegin(), h.cend()); }};
     template <> struct TypeEncoder<Bytes> {
       static Bytes encode(const Bytes& bytes) {
         int pad = 0;
@@ -761,6 +763,15 @@ namespace ABI {
       static Address decode(const BytesArrView& bytes, uint64_t& index) {
         if (index + 32 > bytes.size()) throw std::length_error("Data too short for address");
         auto result = Address(bytes.subspan(index + 12, 20));
+        index += 32;
+        return result;
+      }
+    };
+
+    template <> struct TypeDecoder<Hash> {
+      static Hash decode(const BytesArrView& bytes, uint64_t& index) {
+        if (index + 32 > bytes.size()) throw std::length_error("Data too short for hash");
+        Hash result(bytes.subspan(index, 32));
         index += 32;
         return result;
       }

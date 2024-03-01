@@ -472,6 +472,7 @@ class SDKTestSuite {
     ) {
       // Create the transaction data
       Hash ret;
+      auto funcName = ContractReflectionInterface::getFunctionName(func);
       Functor txFunctor = ABI::FunctorEncoder::encode<Args...>(
         ContractReflectionInterface::getFunctionName(func)
       );
@@ -479,6 +480,9 @@ class SDKTestSuite {
       Utils::appendBytes(
         txData, ABI::Encoder::encodeData<Args...>(std::forward<decltype(args)>(args)...)
       );
+
+      std::cout << "Functor: " << txFunctor.hex() << std::endl;
+      std::cout << "txData: " << Hex::fromBytes(txData) << std::endl;
       // Use the chain owner account if no account is provided
       TxBlock tx = this->createNewTx(
         ((!testAccount) ? this->getChainOwnerAccount() : testAccount),
@@ -779,7 +783,6 @@ class SDKTestSuite {
       } else {
         lastBlock = firstBlock - 2000;
       }
-      std::cout << "firstBlock: " << firstBlock << " lastBlock: " << lastBlock << std::endl;
       auto allEvents = this->getEvents(firstBlock, lastBlock, address, {});
 
       // Filter the events by the topics

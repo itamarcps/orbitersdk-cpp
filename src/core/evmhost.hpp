@@ -140,6 +140,7 @@ public:
   evmc_tx_context currentTxContext = {};                   // Current transaction context
   Hash currentTxHash;                                      // Current transaction hash
   std::vector<std::array<uint8_t, 32>> m_ecrecover_results; // Used to store the results of ecrecover precompile (so we don't have a memory leak)
+  std::vector<Bytes> abiPackResults;                       // Used to store the results of abi precompile (so we don't have a memory leak)
   std::vector<EVMEvent> emittedEvents;                     // Used to store the emitted events by current call
   mutable bool shouldRevert = false;                               // Used to know if we should revert or commit in the case of a exception inside any of the calls below
 
@@ -198,7 +199,6 @@ public:
     msg.value = Utils::uint256ToEvmcUint256(value);
     msg.create2_salt = {};
     msg.code_address = to.toEvmcAddress();
-
 
     return evmc::Result(evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &msg,
@@ -390,8 +390,43 @@ public:
     }
 
     evmc::Result call(const evmc_message& msg) noexcept override {
+      std::cout << "CALL CALLED..." << std::endl;
       if (msg.recipient == ECRECOVER_ADDRESS) {
         return Precompile::ecrecover(msg, m_ecrecover_results);
+      }
+
+      if (msg.recipient == ABI_PACK) {
+        std::cout << "CALLS PRECOMPILE" << std::endl;
+        static Functor pack(Hex::toBytes("0x8d6c67c5"));
+        static Functor keccakSolSign(Hex::toBytes("0x518af8db"));
+        static Functor keccak(Hex::toBytes("0x23fc7ef3"));
+        if (msg.input_size < 4) {
+          evmc::Result result;
+          std::cerr << "Invalid size for ABI precompiles" << std::endl;
+          result.status_code = EVMC_REVERT;
+          result.output_size = 0;
+        }
+        Functor functor(Utils::cArrayToBytes(msg.input_data, 4));
+        if (functor == pack) {
+          std::cout << "PACK" << std::endl;
+          auto ret = Precompile::packAndHash(msg, m_ecrecover_results);
+          std::cout << "RETURNING" << std::endl;
+          return ret;
+        }
+        std::cout << "uhh" << std::endl;
+        if (functor == keccakSolSign) {
+          std::cout << "KECCAKSOLSIGN" << std::endl;
+          return Precompile::keccakSolSign(msg, m_ecrecover_results);
+        }
+        if (functor == keccak) {
+          std::cout << "KECCAK" << std::endl;
+          return Precompile::keccak(msg, m_ecrecover_results);
+        }
+        evmc::Result result;
+        std::cerr << "Invalid ABI precompile" << std::endl;
+        result.status_code = EVMC_REVERT;
+        result.output_size = 0;
+        return result;
       }
 
       evmc::Result result (evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
@@ -449,6 +484,7 @@ public:
 
     evmc::bytes32 get_transient_storage(const evmc::address &addr, const evmc::bytes32 &key) const noexcept override {
       try {
+        std::cout << "Bro is trying to get transient storage" << std::endl;
         const auto acc = this->accounts.find(addr);
         if (acc == this->accounts.end()) {
           return {};
@@ -487,6 +523,7 @@ public:
         this->accounts[addr].transientStorage.clear();
       }
       m_ecrecover_results.clear();
+      abiPackResults.clear();
       this->accessedStorages.clear();
       this->accessedTransients.clear();
       this->currentTxHash = Hash();
@@ -549,6 +586,7 @@ public:
         this->contractAddresses.erase(addr);
       }
       m_ecrecover_results.clear();
+      abiPackResults.clear();
       this->accessedStorages.clear();
       this->accessedTransients.clear();
       this->recentlyCreatedContracts.clear();
