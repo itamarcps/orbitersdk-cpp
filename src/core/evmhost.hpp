@@ -399,8 +399,12 @@ public:
       if (msg.recipient == ECRECOVER_ADDRESS) {
         return Precompile::ecrecover(msg, m_ecrecover_results);
       }
+      std::cout << "CALL CALLED" << std::endl;
+    std::cout << "to: " << Address(msg.recipient).hex() << std::endl;
+    std::cout << "to: " << Address(msg.code_address).hex() << std::endl;
 
       if (msg.recipient == RANDOM) {
+        std::cout << "random called" << std::endl;
         static Functor RANDOMNESS(Hex::toBytes("0xaacc5a17"));
         if (msg.input_size < 4) {
           evmc::Result result;
@@ -418,6 +422,7 @@ public:
         return result;
       }
 
+
       if (msg.recipient == ABI_PACK) {
         static Functor pack(Hex::toBytes("0xaa6351cc"));
         static Functor keccakSolSign(Hex::toBytes("0x518af8db"));
@@ -428,6 +433,7 @@ public:
           result.output_size = 0;
         }
         Functor functor(Utils::cArrayToBytes(msg.input_data, 4));
+        std::cout << "PACK" << std::endl;
         if (functor == pack) {
           auto ret = Precompile::packAndHash(msg, m_ecrecover_results);
           return ret;

@@ -5,6 +5,7 @@ namespace Precompile {
   evmc::Result ecrecover(const evmc_message& msg, std::vector<std::array<uint8_t, 32>>& addrs) noexcept {
     // We know that V is always a 32 bytes value containing either 27 or 28, extract this into a uint8_t, V is big endian
     evmc::Result result;
+    std::cout << "Called ecrecover precompile" << std::endl;
 
     try {
       // Check if the input data matches the required for ecrecover
@@ -21,6 +22,8 @@ namespace Precompile {
       const auto v = uint8_t(Utils::bytesToUint256(BytesArrView(ecrecoverBytes.data() + 32, 32)));
       const auto r = Utils::bytesToUint256(BytesArrView(ecrecoverBytes.data() + 64, 32));
       const auto s = Utils::bytesToUint256(BytesArrView(ecrecoverBytes.data() + 96, 32));
+      std::cout << "ecrecover r: " << Hex::fromBytes(Utils::uint256ToBytes(r)) << std::endl;
+      std::cout << "ecrecover s: " << Hex::fromBytes(Utils::uint256ToBytes(s)) << std::endl;
       // Check if V is either 27 or 28
       if (v != 27 && v != 28) {
         std::cerr << "Invalid V value for ecrecover precompile V: " << v << std::endl;
@@ -61,26 +64,29 @@ namespace Precompile {
 
   evmc::Result packAndHash(const evmc_message& msg, std::vector<std::array<uint8_t, 32>>& hashs) noexcept {
     evmc::Result result;
+    std::cout << "PackAndHash" << std::endl;
     try {
       // Check if the input data matches the required for ecrecover
-      if (msg.input_size != 84) {
-        std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
+      if (msg.input_size != 100) {
+        std::cerr << "Invalid input size for packAndHash precompile: " << msg.input_size << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;
       }
-      // we need to pack an uint256+address+uint256 (52 bytes)
+      // we need to pack an uint256+address+uint256 (84 bytes)
       BytesArrView packBytes(msg.input_data, msg.input_data + msg.input_size);
       auto resultTlp = ABI::Decoder::decodeData<uint256_t,Address,uint256_t>(packBytes.subspan(4));
       const auto& tokenId = std::get<0>(resultTlp);
       const auto& user = std::get<1>(resultTlp);
       const auto& rarity = std::get<2>(resultTlp);
       Bytes value;
-      value.reserve(52); // 32 bytes for tokenId and 20 bytes for user
+      value.reserve(84); // 32 bytes for tokenId and 20 bytes for user
       Utils::appendBytes(value, Utils::uint256ToBytes(tokenId));
       Utils::appendBytes(value, user.asBytes());
       Utils::appendBytes(value, Utils::uint256ToBytes(rarity));
+      std::cout << "Packandhash value: " << Hex::fromBytes(value) << std::endl;
       auto keccakHash = Utils::sha3(value);
+      std::cout << "Packandhash hash: " << Hex::fromBytes(keccakHash.asBytes()) << std::endl;
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
       hashs.push_back(keccakHashArr);
@@ -101,7 +107,7 @@ namespace Precompile {
     try {
       // Check if the input data matches the required for ecrecover
       if (msg.input_size != 36) {
-        std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
+        std::cerr << "Invalid input size for keccakSolSign precompile: " << msg.input_size << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;
@@ -117,7 +123,9 @@ namespace Precompile {
       value.insert(value.end(), '\n');
       Utils::appendBytes(value, std::to_string(32));
       Utils::appendBytes(value, hash);
+      std::cout << "keccakHash value: " << Hex::fromBytes(value) << std::endl;
       auto keccakHash = Utils::sha3(value);
+      std::cout << "keccakHash hash: " << Hex::fromBytes(hash.asBytes()) << std::endl;
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
       hashs.push_back(keccakHashArr);
@@ -139,7 +147,7 @@ namespace Precompile {
     try {
       // Check if the input data matches the required for ecrecover
       if (msg.input_size > 4) {
-        std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
+        std::cerr << "Invalid input size for keccak precompile: " << msg.input_size << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;
@@ -168,8 +176,8 @@ namespace Precompile {
     evmc::Result result;
     try {
       // Check if the input data matches the required for ecrecover
-      if (msg.input_size == 4) {
-        std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
+      if (!(msg.input_size == 4)) {
+        std::cerr << "Invalid input size for getRandom precompile: " << msg.input_size << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;

@@ -115,7 +115,6 @@ class ERC721Mint : public ERC721 {
       if (_tokenURIit != this->tokenURI_.end()) {
         _tokenURI = _tokenURIit->second;
       }
-
       const auto& base = this->_baseURI();
       if (base.size() == 0) {
         return _tokenURI;

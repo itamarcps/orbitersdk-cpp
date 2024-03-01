@@ -283,7 +283,7 @@ void ERC721Mint::setBaseURI(const std::string& baseURI) {
 }
 
 void ERC721Mint::setTokenURI(const uint256_t &tokenId, const std::string &tokenURI) {
-  this->tokenURI_[tokenId] == tokenURI;
+  this->tokenURI_[tokenId] = tokenURI;
 }
 
 
