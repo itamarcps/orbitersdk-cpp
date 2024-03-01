@@ -152,11 +152,11 @@ class Logger {
 
     /// Post a task to the queue.
     void postLogTask(LogInfo&& infoToLog) noexcept {
-      //{
-      //  std::unique_lock<std::mutex> lock(logQueueMutex_);
-      //  logQueue_.emplace(std::move(infoToLog));
-      //}
-      //cv_.notify_one();
+      {
+        std::unique_lock<std::mutex> lock(logQueueMutex_);
+        logQueue_.emplace(std::move(infoToLog));
+      }
+      cv_.notify_one();
     };
 
   public:

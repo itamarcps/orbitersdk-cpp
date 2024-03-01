@@ -191,6 +191,7 @@ class SDKTestSuite {
      * @return A pointer to the new block.
      */
     const std::shared_ptr<const Block> advanceChain(const uint64_t& timestamp = 0, const std::vector<TxBlock>& txs = {}) {
+      std::cout << "Creating a new block..." << std::endl;
       auto validators = state_.rdposGetValidators();
       auto randomList = state_.rdposGetRandomList();
       Hash blockSignerPrivKey;           // Private key for the block signer.

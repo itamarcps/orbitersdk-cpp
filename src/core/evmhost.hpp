@@ -15,8 +15,8 @@ See the LICENSE.txt file in the project root for more information.
 #include "../utils/safehash.h"
 #include "../utils/db.h"
 #include "storage.h"
-
 #include "ecrecoverprecompile.h"
+#include <evmone/evmone.h>
 /**
  * EVM Abstraction for an account
  * An account holds nonce, code, codehash, balance and storage.
@@ -47,7 +47,7 @@ struct EVMEvent {
 
 class EVMHost : public evmc::Host {
 public:
-  EVMHost(evmc_vm* vm_, const Storage* storage_, DB* db_, const Options* const options_) : vm{vm_}, storage(storage_), db(db_), options(options_) {
+  EVMHost(const Storage* storage_, DB* db_, const Options* const options_, evmc_vm* vm_) :  storage(storage_), db(db_), options(options_), vm(vm_) {
     /// Load from DB if we have saved based on the current chain height
     if (db->has(std::string("latest"), DBPrefix::evmHost)) {
       auto latestSaved = Utils::bytesToUint64(db->get(std::string("latest"), DBPrefix::evmHost));
@@ -161,9 +161,10 @@ public:
     creationMsg.value = Utils::uint256ToEvmcUint256(value);
     creationMsg.create2_salt = {};
     creationMsg.code_address = {};
+    creationMsg.depth = 1;
     creationMsg.flags = 0;
 
-    auto creationResult = evmc::Result(evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+    auto creationResult = evmc::Result(evmc_execute(this->vm, &this->get_interface(), this->to_context(),
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &creationMsg,
                fullData.data(), fullData.size()));
 
@@ -198,9 +199,10 @@ public:
     msg.input_size = fullData.size();
     msg.value = Utils::uint256ToEvmcUint256(value);
     msg.create2_salt = {};
+    msg.depth = 1;
     msg.code_address = to.toEvmcAddress();
 
-    return evmc::Result(evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+    return evmc::Result(evmc_execute(this->vm, &this->get_interface(), this->to_context(),
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &msg,
                 accounts[to].code.second.data(), accounts[to].code.second.size()));
   }
@@ -288,11 +290,11 @@ public:
         this->accessedStorages.emplace_back(addr, key);
         // bytes32 is an array of uint8_t bytes[32];, Hash .raw() returns a pointer to the start of a std::array<uint8_t, 32>
         // We can can the pointer to a bytes32
-        const evmc::bytes32* oldOrig = reinterpret_cast<const evmc::bytes32*>(oldVal.first.raw());
-        evmc::bytes32* oldCurr = reinterpret_cast<evmc::bytes32*>(oldVal.second.raw_non_const());
+        const evmc::bytes32 oldOrig = oldVal.first.toEvmcBytes32();
+        const evmc::bytes32 oldCurr = oldVal.second.toEvmcBytes32();
 
         // Folow EIP-1283
-        if (*oldCurr == value) {
+        if (oldCurr == value) {
           return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
         }
 
@@ -309,7 +311,7 @@ public:
           status = evmc_storage_status::EVMC_STORAGE_ASSIGNED;
         }
 
-        *oldCurr = value;
+        oldVal.second = Hash(value);
         return status;
       } catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -390,46 +392,37 @@ public:
     }
 
     evmc::Result call(const evmc_message& msg) noexcept override {
-      std::cout << "CALL CALLED..." << std::endl;
       if (msg.recipient == ECRECOVER_ADDRESS) {
         return Precompile::ecrecover(msg, m_ecrecover_results);
       }
 
       if (msg.recipient == ABI_PACK) {
-        std::cout << "CALLS PRECOMPILE" << std::endl;
         static Functor pack(Hex::toBytes("0x8d6c67c5"));
         static Functor keccakSolSign(Hex::toBytes("0x518af8db"));
         static Functor keccak(Hex::toBytes("0x23fc7ef3"));
         if (msg.input_size < 4) {
           evmc::Result result;
-          std::cerr << "Invalid size for ABI precompiles" << std::endl;
           result.status_code = EVMC_REVERT;
           result.output_size = 0;
         }
         Functor functor(Utils::cArrayToBytes(msg.input_data, 4));
         if (functor == pack) {
-          std::cout << "PACK" << std::endl;
           auto ret = Precompile::packAndHash(msg, m_ecrecover_results);
-          std::cout << "RETURNING" << std::endl;
           return ret;
         }
-        std::cout << "uhh" << std::endl;
         if (functor == keccakSolSign) {
-          std::cout << "KECCAKSOLSIGN" << std::endl;
           return Precompile::keccakSolSign(msg, m_ecrecover_results);
         }
         if (functor == keccak) {
-          std::cout << "KECCAK" << std::endl;
           return Precompile::keccak(msg, m_ecrecover_results);
         }
         evmc::Result result;
-        std::cerr << "Invalid ABI precompile" << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;
       }
 
-      evmc::Result result (evmc_execute(this->vm, &this->get_interface(), (evmc_host_context*)this,
+      evmc::Result result (evmc_execute(this->vm, &this->get_interface(), this->to_context(),
                evmc_revision::EVMC_LATEST_STABLE_REVISION, &msg,
                accounts[msg.recipient].code.second.data(), accounts[msg.recipient].code.second.size()));
       return result;
@@ -484,7 +477,6 @@ public:
 
     evmc::bytes32 get_transient_storage(const evmc::address &addr, const evmc::bytes32 &key) const noexcept override {
       try {
-        std::cout << "Bro is trying to get transient storage" << std::endl;
         const auto acc = this->accounts.find(addr);
         if (acc == this->accounts.end()) {
           return {};
@@ -575,7 +567,7 @@ public:
       this->accessedAccountsNonces.clear();
     }
 
-    void revert() {
+    void revert(bool log = false) {
       for (const auto& [addr, key] : this->accessedStorages) {
         this->accounts[addr].storage[key].second = this->accounts[addr].storage[key].first;
       }

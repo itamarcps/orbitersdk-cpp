@@ -15,7 +15,7 @@ State::State(
   const Options& options
 ) : db_(db), storage_(storage), p2pManager_(p2pManager), options_(options),
 rdpos_(db, storage, p2pManager, options, *this),
-contractManager_(db, *this, rdpos_, options), evmone_(evmc_create_evmone()), evmHost_(this->evmone_, &this->storage_, &this->db_, &this->options_)
+contractManager_(db, *this, rdpos_, options), vm_(evmc_create_evmone()), evmHost_(&this->storage_, &this->db_, &this->options_, this->vm_)
 {
   std::unique_lock lock(this->stateMutex_);
   auto accountsFromDB = db_.getBatch(DBPrefix::nativeAccounts);
@@ -51,8 +51,8 @@ State::~State() {
   // Each Value == uint256_t + uint256
   DBBatch accountsBatch;
   std::unique_lock lock(this->stateMutex_);
+  evmc_destroy(this->vm_);
   // Delete the vm_ pointer as it is no longer needed.
-  evmc_destroy(this->evmone_);
   for (const auto& [address, account] : this->evmHost_.accounts) {
     Bytes serializedBytes;
     Utils::appendBytes(serializedBytes, Utils::uint256ToBytes(account.balance.second));
@@ -143,6 +143,7 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
       uint256_t gasUsed = tx.getGasLimit() - uint256_t(gasLeft);
       balance -= gasUsed * tx.getMaxFeePerGas();
       if (evmCallResult.status_code || this->evmHost_.shouldRevert) {
+        std::cout << "should revert: " << this->evmHost_.shouldRevert << std::endl;
         throw DynamicException("Error when executing EVM contract, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)) + " bytes: " + Hex::fromBytes(Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size)).get());
       }
 
@@ -413,6 +414,8 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
     return this->contractManager_.callContract(callInfo);
   } else {
     if (this->evmHost_.isEvmContract(to) || to == Address()) {
+      lock.unlock();
+      std::unique_lock unique(this->stateMutex_);
       Utils::safePrint("Estimating gas from evm...");
       if (value) {
         auto realTo = (to == Address()) ? this->evmHost_.deriveContractAddress(this->getNativeNonce(from), from) : to;
@@ -467,6 +470,8 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
   }
 
   if (this->evmHost_.isEvmContract(to) || to == Address()) {
+    lock.unlock();
+    std::unique_lock unique(this->stateMutex_);
     Utils::safePrint("Estimating gas from evm..." + gasLimit.str());
     if (value) {
       Address realTo = (to == Address()) ? this->evmHost_.deriveContractAddress(this->getNativeNonce(from), from) : to;
@@ -484,17 +489,17 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
       100000000,
       this->options_.getChainID());
     auto evmCallResult = this->evmHost_.execute(callInfo);
+    // Revert EVERYTHING from the call.
+
+    this->evmHost_.revert(true);
+    this->evmHost_.revertCode();
+    this->evmHost_.revertBalance();
 
     int64_t gasLeft = evmCallResult.gas_left;
     gasLeft - 21000;
     if (gasLeft < 0) {
       throw DynamicException("Error when estimating gas, gasLimit is lower than gas left");
     }
-
-    // Revert EVERYTHING from the call.
-    this->evmHost_.revert();
-    this->evmHost_.revertCode();
-    this->evmHost_.revertBalance();
 
     if (evmCallResult.status_code) {
       throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)) + " bytes: " + Hex::fromBytes(Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size)).get());

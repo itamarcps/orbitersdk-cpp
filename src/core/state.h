@@ -25,13 +25,13 @@ enum TxInvalid { NotInvalid, InvalidNonce, InvalidBalance };
 /// Abstraction of the blockchain's current state at the current block.
 class State {
   private:
+    evmc_vm* vm_;  ///< Pointer to the EVMC VM.
     const Options& options_;  ///< Reference to the options singleton.
     DB& db_;  ///< Reference to the database.
     Storage& storage_;  ///< Reference to the blockchain's storage.
     P2P::ManagerNormal& p2pManager_;  ///< Reference to the P2P connection manager.
     rdPoS rdpos_; ///< rdPoS object (consensus).
     ContractManager contractManager_; ///< Contract Manager.
-    evmc_vm *evmone_; ///< EVMONE VM.
     mutable EVMHost evmHost_; ///< EVM Host. mutable because we are funnnyyyy :)))
     std::unordered_map<Hash, TxBlock, SafeHash> mempool_; ///< TxBlock mempool.
     mutable std::shared_mutex stateMutex_;  ///< Mutex for managing read/write access to the state object.

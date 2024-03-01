@@ -24,7 +24,7 @@ uint256_t Hash::toUint256() const { return Utils::bytesToUint256(data_); }
 
 evmc::bytes32 Hash::toEvmcBytes32() const {
   evmc::bytes32 bytes;
-  std::copy(this->data_.begin(), this->data_.end(), bytes.bytes);
+  std::memcpy(reinterpret_cast<void*>(bytes.bytes), this->data_.data(), 32);
   return bytes;
 }
 

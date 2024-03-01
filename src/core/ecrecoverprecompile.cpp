@@ -5,6 +5,7 @@ namespace Precompile {
   evmc::Result ecrecover(const evmc_message& msg, std::vector<std::array<uint8_t, 32>>& addrs) noexcept {
     // We know that V is always a 32 bytes value containing either 27 or 28, extract this into a uint8_t, V is big endian
     evmc::Result result;
+
     try {
       // Check if the input data matches the required for ecrecover
       if (msg.input_size != 132) {
@@ -39,11 +40,6 @@ namespace Precompile {
       auto sig = Secp256k1::makeSig(r, s, parity);
       // Recover to address!
       auto addr = Secp256k1::toAddress(Secp256k1::recover(sig, msgHash));
-      std::cout << "ecrecover msghash: " << msgHash.hex() << std::endl;
-      std::cout << "ecrecover v: " << Hex::fromBytes(Utils::uint256ToBytes(v)) << std::endl;
-      std::cout << "ecrecover r: " << Hex::fromBytes(Utils::uint256ToBytes(r)) << std::endl;
-      std::cout << "ecrecover s: " << Hex::fromBytes(Utils::uint256ToBytes(s)) << std::endl;
-      std::cout << "ecrecover addr: " << addr.hex() << std::endl;
       // Uhhhhhhhhhhhh funny moment, evmc::Result uses a data pointer* and the VM is required to free it, but we are not a VM so what happens?
       // We instead create a std::array<32> and make the pointer points to it, and annotate it into the Host so the host can free it
       BytesArr<32> addrBytes = {};
@@ -75,19 +71,14 @@ namespace Precompile {
       }
       // we need to pack an uint256+address (52 bytes)
       BytesArrView packBytes(msg.input_data, msg.input_data + msg.input_size);
-      std::cout << "packBytes.subspan(4).size(): " << packBytes.subspan(4).size() << std::endl;
       auto resultTlp = ABI::Decoder::decodeData<uint256_t,Address>(packBytes.subspan(4));
       const auto& tokenId = std::get<0>(resultTlp);
       const auto& user = std::get<1>(resultTlp);
-      std::cout << "tokenId: " << tokenId << std::endl;
-      std::cout << "user: " << user.hex() << std::endl;
       Bytes value;
       value.reserve(52); // 32 bytes for tokenId and 20 bytes for user
       Utils::appendBytes(value, Utils::uint256ToBytes(tokenId));
       Utils::appendBytes(value, user.asBytes());
-      std::cout << "packAndHash pack: " << Hex::fromBytes(value) << std::endl;
       auto keccakHash = Utils::sha3(value);
-      std::cout << "packAndHash keccakHash: " << keccakHash.hex() << std::endl;
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
       hashs.push_back(keccakHashArr);
@@ -95,7 +86,6 @@ namespace Precompile {
       result.output_data = hashs.back().data();
       result.output_size = 32;
       result.gas_left = msg.gas;
-      std::cout << "PACKED: "  << keccakHash.hex() << std::endl;
       return result;
     } catch (const std::exception& e) {
       std::cerr << e.what() << std::endl;
@@ -125,7 +115,6 @@ namespace Precompile {
       value.insert(value.end(), '\n');
       Utils::appendBytes(value, std::to_string(32));
       Utils::appendBytes(value, hash);
-      std::cout << "keccakSolSign pack: " << Hex::fromBytes(value) << std::endl;
       auto keccakHash = Utils::sha3(value);
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
