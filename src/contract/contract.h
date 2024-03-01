@@ -19,6 +19,7 @@ See the LICENSE.txt file in the project root for more information.
 #include "../utils/utils.h"
 #include "../utils/dynamicexception.h"
 #include "variables/safebase.h"
+#include "../utils/randomgen.h"
 
 // Forward declarations.
 class ContractCallLogger;
@@ -31,6 +32,7 @@ class ContractGlobals {
     static Hash blockHash_;           ///< Current block hash.
     static uint64_t blockHeight_;     ///< Current block height.
     static uint64_t blockTimestamp_;  ///< Current block timestamp.
+    static RandomGen* randomGen_;            ///< Pointer to the RandomGen instance.
 
   public:
     ///@{
@@ -39,6 +41,7 @@ class ContractGlobals {
     static const Hash& getBlockHash() { return ContractGlobals::blockHash_; }
     static const uint64_t& getBlockHeight() { return ContractGlobals::blockHeight_; }
     static const uint64_t& getBlockTimestamp() { return ContractGlobals::blockTimestamp_; }
+    static uint256_t getNextRandom() { return randomGen_->getNext(); }
     ///@}
 
     /// ContractManager can update private global vars (e.g. before ethCall() with a TxBlock, State calls CM->updateContractGlobals(...)).

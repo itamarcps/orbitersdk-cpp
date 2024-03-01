@@ -13,6 +13,7 @@ See the LICENSE.txt file in the project root for more information.
 #include "../core/rdpos.h"
 #include "../core/state.h"
 #include "../utils/dynamicexception.h"
+#include "utils/randomgen.h"
 
 ContractManager::ContractManager(DB& db, State& state, rdPoS& rdpos, const Options& options)
 : BaseContract("ContractManager", ProtocolContractAddresses.at("ContractManager"), options.getChainOwner(), 0, db),
@@ -275,6 +276,10 @@ void ContractManager::updateContractGlobals(
   ContractGlobals::blockHash_ = blockHash;
   ContractGlobals::blockHeight_ = blockHeight;
   ContractGlobals::blockTimestamp_ = blockTimestamp;
+}
+
+void ContractManager::updateRandomGen(RandomGen* randomGen) const {
+  ContractGlobals::randomGen_ = randomGen;
 }
 
 void ContractManagerInterface::registerVariableUse(SafeBase& variable) {

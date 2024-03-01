@@ -265,6 +265,8 @@ class ContractManager : public BaseContract {
       const uint64_t& blockHeight, const uint64_t& blockTimestamp
     ) const;
 
+    void updateRandomGen(RandomGen* randomGen) const;  ///< Update the RandomGen pointer.
+
     /// ContractManagerInterface is a friend so it can access private members.
     friend class ContractManagerInterface;
 

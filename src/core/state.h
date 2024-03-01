@@ -15,6 +15,7 @@ See the LICENSE.txt file in the project root for more information.
 #include "../utils/db.h"
 #include "storage.h"
 #include "rdpos.h"
+#include "../utils/randomgen.h"
 
 // TODO: We could possibly change the bool functions into an enum function,
 // to be able to properly return each error case. We need this in order to slash invalid rdPoS blocks.
@@ -36,6 +37,7 @@ class State {
     std::unordered_map<Hash, TxBlock, SafeHash> mempool_; ///< TxBlock mempool.
     mutable std::shared_mutex stateMutex_;  ///< Mutex for managing read/write access to the state object.
     bool processingPayable_ = false;  ///< Indicates whether the state is currently processing a payable contract function.
+    mutable std::unique_ptr<RandomGen> currentRandomGen_; ///< RandomGen object for the current state.s
 
     /**
      * Verify if a transaction can be accepted within the current state.

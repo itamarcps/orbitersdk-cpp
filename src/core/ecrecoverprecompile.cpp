@@ -63,21 +63,23 @@ namespace Precompile {
     evmc::Result result;
     try {
       // Check if the input data matches the required for ecrecover
-      if (msg.input_size != 68) {
+      if (msg.input_size != 84) {
         std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;
       }
-      // we need to pack an uint256+address (52 bytes)
+      // we need to pack an uint256+address+uint256 (52 bytes)
       BytesArrView packBytes(msg.input_data, msg.input_data + msg.input_size);
-      auto resultTlp = ABI::Decoder::decodeData<uint256_t,Address>(packBytes.subspan(4));
+      auto resultTlp = ABI::Decoder::decodeData<uint256_t,Address,uint256_t>(packBytes.subspan(4));
       const auto& tokenId = std::get<0>(resultTlp);
       const auto& user = std::get<1>(resultTlp);
+      const auto& rarity = std::get<2>(resultTlp);
       Bytes value;
       value.reserve(52); // 32 bytes for tokenId and 20 bytes for user
       Utils::appendBytes(value, Utils::uint256ToBytes(tokenId));
       Utils::appendBytes(value, user.asBytes());
+      Utils::appendBytes(value, Utils::uint256ToBytes(rarity));
       auto keccakHash = Utils::sha3(value);
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
@@ -155,6 +157,34 @@ namespace Precompile {
       result.output_size = 32;
       result.gas_left = msg.gas;
       return result;
+    } catch (const std::exception& e) {
+      std::cerr << e.what() << std::endl;
+      result.status_code = EVMC_REVERT;
+      result.output_size = 0;
+      return result;
+    }
+  }
+  evmc::Result getRandom(const evmc_message& msg, std::vector<std::array<uint8_t, 32>>& hashs, RandomGen* random) noexcept {
+    evmc::Result result;
+    try {
+      // Check if the input data matches the required for ecrecover
+      if (msg.input_size == 4) {
+        std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
+        result.status_code = EVMC_REVERT;
+        result.output_size = 0;
+        return result;
+      }
+      auto randomValueUint = random->getNext();
+      auto randomValue = Utils::uint256ToBytes(randomValueUint);
+      std::array<uint8_t, 32> randomValueArr;
+      std::copy(randomValue.cbegin(), randomValue.cend(), randomValueArr.begin());
+      hashs.push_back(randomValueArr);
+      result.status_code = EVMC_SUCCESS;
+      result.output_data = hashs.back().data();
+      result.output_size = 32;
+      result.gas_left = msg.gas;
+      return result;
+
     } catch (const std::exception& e) {
       std::cerr << e.what() << std::endl;
       result.status_code = EVMC_REVERT;

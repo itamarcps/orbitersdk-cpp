@@ -121,12 +121,14 @@ contract MyTokenMintable is ERC721 {
 */
 
 ERC721Mint::ERC721Mint(ContractManagerInterface &interface, const Address &address, DB& db)
-: ERC721(interface, address, db), tokenIdCounter_(this), totalSupply_(this), maxSupply_(this), signer_(this), preBurnedTokens_(this), burnedTokens_(this)
+: ERC721(interface, address, db), tokenIdCounter_(this), totalSupply_(this), maxSupply_(this), signer_(this),
+preBurnedTokens_(this), burnedTokens_(this), _tokenBaseURI(this), tokenIdRarity_(this), tokenURI_(this)
 {
   this->tokenIdCounter_ = Utils::bytesToUint256(this->db_.get(std::string("tokenIdCounter_"), this->getDBPrefix()));
   this->totalSupply_ = Utils::bytesToUint256(this->db_.get(std::string("totalSupply_"), this->getDBPrefix()));
   this->maxSupply_ = Utils::bytesToUint256(this->db_.get(std::string("maxSupply_"), this->getDBPrefix()));
   this->signer_ = Address(this->db_.get(std::string("signer_"), this->getDBPrefix()));
+  this->_tokenBaseURI = Utils::bytesToString(this->db_.get(std::string("_tokenBaseURI"), this->getDBPrefix()));
 
   auto preBurnedTokens = this->db_.getBatch(this->getNewPrefix("preBurnedTokens_"));
   for (const auto& dbEntry : preBurnedTokens) {
@@ -135,7 +137,8 @@ ERC721Mint::ERC721Mint(ContractManagerInterface &interface, const Address &addre
     uint8_t v = value[20];
     uint256_t r = Utils::fromBigEndian<uint256_t>(value.subspan(21,32));
     uint256_t s = Utils::fromBigEndian<uint256_t>(value.subspan(53,32));
-    this->preBurnedTokens_[Utils::fromBigEndian<uint256_t>(dbEntry.key)] = std::make_tuple(true, user, v, r, s);
+    uint256_t rarity = Utils::fromBigEndian<uint256_t>(value.subspan(85,32));
+    this->preBurnedTokens_[Utils::fromBigEndian<uint256_t>(dbEntry.key)] = std::make_tuple(true, user, v, r, s, rarity);
   }
 
   auto burnedTokens = this->db_.getBatch(this->getNewPrefix("burnedTokens_"));
@@ -145,7 +148,18 @@ ERC721Mint::ERC721Mint(ContractManagerInterface &interface, const Address &addre
     uint8_t v = value[20];
     uint256_t r = Utils::fromBigEndian<uint256_t>(value.subspan(21,32));
     uint256_t s = Utils::fromBigEndian<uint256_t>(value.subspan(53,32));
-    this->burnedTokens_[Utils::fromBigEndian<uint256_t>(dbEntry.key)] = std::make_tuple(true, user, v, r, s);
+    uint256_t rarity = Utils::fromBigEndian<uint256_t>(value.subspan(85,32));
+    this->burnedTokens_[Utils::fromBigEndian<uint256_t>(dbEntry.key)] = std::make_tuple(true, user, v, r, s, rarity);
+  }
+
+  auto tokenIdRarity = this->db_.getBatch(this->getNewPrefix("tokenIdRarity_"));
+  for (const auto& dbEntry : tokenIdRarity) {
+    this->tokenIdRarity_[Utils::fromBigEndian<uint256_t>(dbEntry.key)] = Utils::fromBigEndian<uint256_t>(dbEntry.value);
+  }
+
+  auto tokenURI = this->db_.getBatch(this->getNewPrefix("tokenURI_"));
+  for (const auto& dbEntry : tokenURI) {
+    this->tokenURI_[Utils::fromBigEndian<uint256_t>(dbEntry.key)] = Utils::bytesToString(dbEntry.value);
   }
 
   this->tokenIdCounter_.commit();
@@ -154,6 +168,9 @@ ERC721Mint::ERC721Mint(ContractManagerInterface &interface, const Address &addre
   this->signer_.commit();
   this->preBurnedTokens_.commit();
   this->burnedTokens_.commit();
+  this->_tokenBaseURI.commit();
+  this->tokenIdRarity_.commit();
+  this->tokenURI_.commit();
 
   this->registerContractFunctions();
 
@@ -163,15 +180,19 @@ ERC721Mint::ERC721Mint(ContractManagerInterface &interface, const Address &addre
   this->signer_.enableRegister();
   this->preBurnedTokens_.enableRegister();
   this->burnedTokens_.enableRegister();
+  this->_tokenBaseURI.enableRegister();
+  this->tokenIdRarity_.enableRegister();
+  this->tokenURI_.enableRegister();
 
 }
 
 ERC721Mint::ERC721Mint(
-  const std::string &erc721name, const std::string &erc721symbol, const uint256_t& maxTokens, const Address &signer,
+  const std::string &erc721name, const std::string &erc721symbol, const uint256_t& maxTokens, const Address &signer, const std::string& baseURI,
   ContractManagerInterface &interface, const Address &address,
   const Address &creator, const uint64_t &chainId, DB& db)
 : ERC721("ERC721Mint", erc721name, erc721symbol, interface, address, creator, chainId, db),
-  tokenIdCounter_(this, 0), maxSupply_(this, maxTokens), totalSupply_(this, 0), signer_(this, signer), preBurnedTokens_(this), burnedTokens_(this)
+  tokenIdCounter_(this, 0), maxSupply_(this, maxTokens), totalSupply_(this, 0), signer_(this, signer),
+preBurnedTokens_(this), burnedTokens_(this), tokenIdRarity_(this), _tokenBaseURI(this, baseURI), tokenURI_(this)
 {
   tokenIdCounter_.commit();
   maxSupply_.commit();
@@ -179,6 +200,9 @@ ERC721Mint::ERC721Mint(
   signer_.commit();
   preBurnedTokens_.commit();
   burnedTokens_.commit();
+  _tokenBaseURI.commit();
+  tokenIdRarity_.commit();
+  tokenURI_.commit();
 
   this->registerContractFunctions();
 
@@ -188,6 +212,9 @@ ERC721Mint::ERC721Mint(
   signer_.enableRegister();
   preBurnedTokens_.enableRegister();
   burnedTokens_.enableRegister();
+  _tokenBaseURI.enableRegister();
+  tokenIdRarity_.enableRegister();
+  tokenURI_.enableRegister();
 }
 
 ERC721Mint::~ERC721Mint() {
@@ -195,26 +222,36 @@ ERC721Mint::~ERC721Mint() {
   this->db_.put(std::string("totalSupply_"), Utils::uint256ToBytes(this->totalSupply_.get()), this->getDBPrefix());
   this->db_.put(std::string("maxSupply_"), Utils::uint256ToBytes(this->maxSupply_.get()), this->getDBPrefix());
   this->db_.put(std::string("signer_"), this->signer_.get().asBytes(), this->getDBPrefix());
+  this->db_.put(std::string("_tokenBaseURI"), Utils::stringToBytes(this->_tokenBaseURI.get()), this->getDBPrefix());
   DBBatch batch;
   for (auto it = this->preBurnedTokens_.cbegin(); it != this->preBurnedTokens_.cend(); ++it) {
-    const auto& [ exists, user, v, r, s ] = it->second;
+    const auto& [ exists, user, v, r, s, rarity] = it->second;
     // Key: tokenId
     // Value: user (20 bytes) + v (1 byte) + r (32 bytes) + s (32 bytes)
     Bytes value = user.asBytes();
     value.insert(value.end(), uint8_t(v));
     Utils::appendBytes(value, r.asBytes());
     Utils::appendBytes(value, s.asBytes());
+    Utils::appendBytes(value, Utils::uint256ToBytes(rarity));
     batch.push_back(Utils::uint256ToBytes(it->first), value, this->getNewPrefix("preBurnedTokens_"));
   }
   for (auto it = this->burnedTokens_.cbegin(); it != this->burnedTokens_.cend(); ++it) {
-    const auto& [ exists, user, v, r, s ] = it->second;
+    const auto& [ exists, user, v, r, s, rarity ] = it->second;
     // Key: tokenId
     // Value: user (20 bytes) + v (1 byte) + r (32 bytes) + s (32 bytes)
     Bytes value = user.asBytes();
     value.insert(value.end(), uint8_t(v));
     Utils::appendBytes(value, r.asBytes());
     Utils::appendBytes(value, s.asBytes());
+    Utils::appendBytes(value, Utils::uint256ToBytes(rarity));
     batch.push_back(Utils::uint256ToBytes(it->first), value, this->getNewPrefix("burnedTokens_"));
+  }
+
+  for (auto it = this->tokenIdRarity_.cbegin(); it != this->tokenIdRarity_.cend(); ++it) {
+    batch.push_back(Utils::uint256ToBytes(it->first), Utils::uint256ToBytes(it->second), this->getNewPrefix("tokenIdRarity_"));
+  }
+  for (auto it = this->tokenURI_.cbegin(); it != this->tokenURI_.cend(); ++it) {
+    batch.push_back(Utils::uint256ToBytes(it->first), Utils::stringToBytes(it->second), this->getNewPrefix("tokenURI_"));
   }
   this->db_.putBatch(batch);
 }
@@ -232,7 +269,23 @@ void ERC721Mint::registerContractFunctions() {
   this->registerMemberFunction("signer", &ERC721Mint::signer, FunctionTypes::View, this);
   this->registerMemberFunction("preBurnedTokens", &ERC721Mint::preBurnedTokens, FunctionTypes::View, this);
   this->registerMemberFunction("burnedTokens", &ERC721Mint::burnedTokens, FunctionTypes::View, this);
+  this->registerMemberFunction("setBaseURI", &ERC721Mint::setBaseURI, FunctionTypes::NonPayable, this);
+  this->registerMemberFunction("getTokenRarity", &ERC721Mint::getTokenRarity, FunctionTypes::View, this);
+  this->registerMemberFunction("_baseURI", &ERC721Mint::_baseURI, FunctionTypes::View, this);
+  this->registerMemberFunction("tokenURI", &ERC721Mint::tokenURI, FunctionTypes::View, this);
 }
+
+void ERC721Mint::setBaseURI(const std::string& baseURI) {
+  if (this->getCaller() != this->getContractCreator()) {
+    throw DynamicException("ERC721Mint: caller is not the contract creator");
+  }
+  this->_tokenBaseURI = baseURI;
+}
+
+void ERC721Mint::setTokenURI(const uint256_t &tokenId, const std::string &tokenURI) {
+  this->tokenURI_[tokenId] == tokenURI;
+}
+
 
 void ERC721Mint::mint(const Address& to) {
   if(this->tokenIdCounter_.get() >= this->maxSupply_.get()) {
@@ -240,6 +293,15 @@ void ERC721Mint::mint(const Address& to) {
   }
   // Mint the NFT to the user's provided address
   this->mint_(to, this->tokenIdCounter_.get());
+  uint256_t randomNum = this->getNextRandom() % 10000;
+  uint256_t rarity = 0;
+  if (randomNum % 100 == 0) {
+    rarity = 1;
+  } else if (randomNum % 1000 == 0) {
+    rarity = 2;
+  }
+  this->setTokenURI(this->tokenIdCounter_.get(), this->getTokenRarity(rarity));
+  this->tokenIdRarity_[tokenIdCounter_.get()] = rarity;
   // Housekeeping parameters
   this->tokenIdCounter_ += 1;
   this->totalSupply_ += 1;
@@ -252,13 +314,13 @@ void ERC721Mint::preBurn (const uint256_t& tokenId) {
   // burn the token
   this->burn_(tokenId);
   // Annotate the tokenId and the user (who is the owner of the token) as pre-burned
-  this->preBurnedTokens_[tokenId] = std::make_tuple(true, this->getCaller(), 0, Hash(), Hash());
+  this->preBurnedTokens_[tokenId] = std::make_tuple(true, this->getCaller(), 0, Hash(), Hash(), this->tokenIdRarity_[tokenId]);
   // Emit Preburned event
-  this->PreBurnedEvent(tokenId, this->getCaller());
+  this->PreBurnedEvent(tokenId, this->getCaller(), this->tokenIdRarity_[tokenId]);
 }
 
 void ERC721Mint::burn (const uint256_t& tokenId, const uint8_t& v, const Hash& r, const Hash& s) {
-  const auto& [ exists, user, v_, r_, s_ ] = this->preBurnedTokens_[tokenId];
+  const auto& [ exists, user, v_, r_, s_ , rarity_ ] = this->preBurnedTokens_[tokenId];
 
   if(!exists) {
     throw DynamicException("MyTokenMintable: token is not pre-burned");
@@ -281,7 +343,7 @@ void ERC721Mint::burn (const uint256_t& tokenId, const uint8_t& v, const Hash& r
     throw DynamicException("MyToken Mintable: invalid signature: got: " + recoveredSigner.hex().get() + " expected: " + this->signer_.get().hex().get());
   }
   // Annotate the tokenId and the user (who is the owner of the token) as burned
-  this->burnedTokens_[tokenId] = std::make_tuple(true, user, v, r, s);
+  this->burnedTokens_[tokenId] = std::make_tuple(true, user, v, r, s, this->tokenIdRarity_[tokenId]);
   // Remove the tokenId from the pre-burned tokens
   this->preBurnedTokens_.erase(tokenId);
 }
@@ -292,6 +354,12 @@ Bytes ERC721Mint::message (const uint256_t& tokenId, const Address& user) const 
   value.reserve(52); // 32 bytes for tokenId and 20 bytes for user
   Utils::appendBytes(value, Utils::uint256ToBytes(tokenId));
   Utils::appendBytes(value, user.asBytes());
+  auto rarityIt = this->tokenIdRarity_.find(tokenId);
+  if (rarityIt == this->tokenIdRarity_.end()) {
+    throw DynamicException("ERC72Mint::message: invalid token rarity");
+  }
+  const uint256_t& rarity = rarityIt->second;
+  Utils::appendBytes(value, Utils::uint256ToBytes(rarity));
   return value;
 }
 

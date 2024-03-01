@@ -34,7 +34,7 @@ class RandomGen {
      * Constructor.
      * @param seed A random seed for initialization.
      */
-    explicit RandomGen(const Hash& seed) : seed_(seed) {};
+    RandomGen(const Hash& seed) : seed_(seed) {};
 
     /// Getter for `seed_`.
     inline const Hash& getSeed() const { std::lock_guard lock(seedLock_); return this->seed_; }
@@ -63,6 +63,7 @@ class RandomGen {
       }
     }
 
+    uint256_t getNext();
     /// Call operator that generates and returns a new random seed.
     uint256_t operator()();
 };

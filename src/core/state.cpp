@@ -42,6 +42,8 @@ contractManager_(db, *this, rdpos_, options), vm_(evmc_create_evmone()), evmHost
   this->contractManager_.updateContractGlobals(Secp256k1::toAddress(latestBlock->getValidatorPubKey()), latestBlock->hash(), latestBlock->getNHeight(), latestBlock->getTimestamp());
   this->evmHost_.commitBalance();
   this->evmHost_.commitNonce();
+  this->currentRandomGen_ = std::make_unique<RandomGen>(latestBlock->getBlockRandomness());
+  this->contractManager_.updateRandomGen(this->currentRandomGen_.get());
 }
 
 State::~State() {
@@ -134,7 +136,7 @@ void State::processTransaction(const TxBlock& tx, const Hash& blockHash, const u
     try {
       this->evmHost_.setTxContext(tx.txToCallInfo(), blockHash, blockHeight, blockCoinbase, blockTimestamp, blockGasLimit, chainId);
       this->evmHost_.currentTxHash = tx.hash();
-      auto evmCallResult = this->evmHost_.execute(tx.txToCallInfo());
+      auto evmCallResult = this->evmHost_.execute(tx.txToCallInfo(), this->currentRandomGen_.get());
       int64_t gasLeft = evmCallResult.gas_left;
       gasLeft - 21000;
       if (gasLeft < 0) {
@@ -332,6 +334,8 @@ void State::processNextBlock(Block&& block) {
   // Update contract globals based on (now) latest block
   const Hash blockHash = block.hash();
   this->contractManager_.updateContractGlobals(Secp256k1::toAddress(block.getValidatorPubKey()), blockHash, block.getNHeight(), block.getTimestamp());
+  this->currentRandomGen_ = std::make_unique<RandomGen>(block.getBlockRandomness());
+  this->contractManager_.updateRandomGen(this->currentRandomGen_.get());
 
   // Process transactions of the block within the current state
   uint64_t txIndex = 0;
@@ -411,11 +415,14 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
   std::shared_lock lock(this->stateMutex_);
   auto &address = std::get<1>(callInfo);
   if (this->contractManager_.isContractAddress(address)) {
+    this->currentRandomGen_ = std::make_unique<RandomGen>(storage_.latest()->getBlockRandomness());
+    this->contractManager_.updateRandomGen(this->currentRandomGen_.get());
     return this->contractManager_.callContract(callInfo);
   } else {
     if (this->evmHost_.isEvmContract(to) || to == Address()) {
       lock.unlock();
       std::unique_lock unique(this->stateMutex_);
+      this->currentRandomGen_ = std::make_unique<RandomGen>(storage_.latest()->getBlockRandomness());
       Utils::safePrint("Estimating gas from evm...");
       if (value) {
         auto realTo = (to == Address()) ? this->evmHost_.deriveContractAddress(this->getNativeNonce(from), from) : to;
@@ -432,7 +439,7 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
         latestBlock->getTimestamp(),
         100000000,
         this->options_.getChainID());
-      auto evmCallResult = this->evmHost_.execute(callInfo);
+      auto evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
 
       // Revert EVERYTHING from the call.
       this->evmHost_.revert();
@@ -466,11 +473,14 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
 
   if (this->contractManager_.isContractAddress(to)) {
     Utils::safePrint("Estimating gas from state...");
+    this->currentRandomGen_ = std::make_unique<RandomGen>(storage_.latest()->getBlockRandomness());
+    this->contractManager_.updateRandomGen(this->currentRandomGen_.get());
     this->contractManager_.validateCallContractWithTx(callInfo);
   }
 
   if (this->evmHost_.isEvmContract(to) || to == Address()) {
     lock.unlock();
+    this->currentRandomGen_ = std::make_unique<RandomGen>(storage_.latest()->getBlockRandomness());
     std::unique_lock unique(this->stateMutex_);
     Utils::safePrint("Estimating gas from evm..." + gasLimit.str());
     if (value) {
@@ -488,7 +498,7 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
       latestBlock->getTimestamp(),
       100000000,
       this->options_.getChainID());
-    auto evmCallResult = this->evmHost_.execute(callInfo);
+    auto evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
     // Revert EVERYTHING from the call.
 
     this->evmHost_.revert(true);

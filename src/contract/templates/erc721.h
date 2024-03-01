@@ -249,7 +249,7 @@ public:
    * @param tokenId The tokenId to query the URI of.
    * @return The URI of the specified tokenId.
    */
-  std::string tokenURI(const uint256_t &tokenId) const;
+  virtual std::string tokenURI(const uint256_t &tokenId) const;
 
   /**
    * Approve a token to be transferred by a third party.

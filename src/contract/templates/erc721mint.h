@@ -21,27 +21,36 @@ class ERC721Mint : public ERC721 {
     // third - the v value of the signature
     // fourth - the r value of the signature
     // fifth - the s value of the signature
-    using BurnedToken = std::tuple<bool, Address, uint8_t, Hash, Hash>;
+    // sixth - the rarity of the token
+    using BurnedToken = std::tuple<bool, Address, uint8_t, Hash, Hash, uint256_t>;
 
+    SafeString _tokenBaseURI; ///< Base URI for the token
     SafeUint256_t tokenIdCounter_; ///< TokenId Counter for the public mint() functions.
     SafeUint256_t totalSupply_; ///< How many tokens exist.
     SafeUint256_t maxSupply_; ///< How many tokens can be minted (used by mint()).
     SafeAddress signer_; ///< The signer address for the burn function
     SafeUnorderedMap<uint256_t, BurnedToken> preBurnedTokens_; ///< Pre-burned tokens
     SafeUnorderedMap<uint256_t, BurnedToken> burnedTokens_; ///< Burned tokens
+    SafeUnorderedMap<uint256_t, uint256_t> tokenIdRarity_;
+    SafeUnorderedMap<uint256_t, std::string> tokenURI_;
     void registerContractFunctions() override; ///< Register contract functions.
 
+    void setTokenURI(const uint256_t& tokenId, const std::string& tokenURI);
   public:
 
-    void PreBurnedEvent(const EventParam<uint256_t, false>& tokenId, const EventParam<Address, false>& addr) {
-      this->emitEvent(__func__, std::make_tuple(tokenId, addr));
+    void PreBurnedEvent(const EventParam<uint256_t, false>& tokenId, const EventParam<Address, false>& addr, const EventParam<uint256_t, false>& rarity) {
+      this->emitEvent(__func__, std::make_tuple(tokenId, addr, rarity));
+    }
+
+    void MetadataUpdate(const EventParam<uint256_t, false>& tokenId) {
+      this->emitEvent(__func__, std::make_tuple(tokenId));
     }
     /**
      * ConstructorArguments is a tuple of the contract constructor arguments in
      * the order they appear in the constructor.
      */
     using ConstructorArguments =
-       std::tuple<const std::string &, const std::string &, const uint256_t&, const Address &>;
+       std::tuple<const std::string &, const std::string &, const uint256_t&, const Address &, const std::string& >;
 
     /**
      * Constructor for loading contract from DB.
@@ -63,7 +72,7 @@ class ERC721Mint : public ERC721 {
      * @param chainId The chain where the contract wil be deployed.
      * @param db Reference to the database object.
      */
-    ERC721Mint(const std::string &erc721name, const std::string &erc721symbol, const uint256_t& maxSupply, const Address &signer,
+    ERC721Mint(const std::string &erc721name, const std::string &erc721symbol, const uint256_t& maxSupply, const Address &signer, const std::string& tokenBaseURI,
            ContractManagerInterface &interface, const Address &address,
            const Address &creator, const uint64_t &chainId,
            DB& db);
@@ -76,6 +85,49 @@ class ERC721Mint : public ERC721 {
     void preBurn (const uint256_t& tokenId);
 
     void burn (const uint256_t& tokenId, const uint8_t& v, const Hash& r, const Hash& s);
+
+    void setBaseURI(const std::string& baseURI);
+
+    std::string getTokenRarity(const uint256_t& tokenRarity) const {
+      if (tokenRarity == 0) {
+        return "bronze";
+      } else if (tokenRarity == 1) {
+        return "silver";
+      } else if (tokenRarity == 2) {
+        return "gold";
+      } else {
+        throw DynamicException("ERC72Mint::getTokenRarity: invalid token rarity");
+      }
+    }
+
+    std::string _baseURI() const {
+      return _tokenBaseURI.get();
+    }
+
+    std::string tokenURI(const uint256_t& tokenId) const override {
+      Address owner = this->ownerOf_(tokenId);
+      if (owner == Address()) {
+        throw DynamicException("ERC72Mint::tokenURI: inexistent token");
+      }
+
+      auto _tokenURIit = this->tokenURI_.find(tokenId);
+      std::string _tokenURI = "";
+      if (_tokenURIit != this->tokenURI_.end()) {
+        _tokenURI = _tokenURIit->second;
+      }
+
+      const auto& base = this->_baseURI();
+      if (base.size() == 0) {
+        return _tokenURI;
+      }
+
+      if (_tokenURI.size() > 0) {
+        return base + _tokenURI;
+      }
+
+      return ERC721::tokenURI(tokenId);
+    }
+
 
     Bytes message (const uint256_t& tokenId, const Address& user) const;
 
@@ -102,7 +154,7 @@ class ERC721Mint : public ERC721 {
       if (it != this->preBurnedTokens_.end()) {
         return it->second;
       }
-      return BurnedToken(false, Address(), 0, 0, 0);
+      return BurnedToken(false, Address(), 0, 0, 0, 0);
     }
 
     BurnedToken burnedTokens(const uint256_t& tokenId) const {
@@ -110,7 +162,7 @@ class ERC721Mint : public ERC721 {
       if (it != this->burnedTokens_.end()) {
         return it->second;
       }
-      return BurnedToken(false, Address(), 0, 0, 0);
+      return BurnedToken(false, Address(), 0, 0, 0, 0);
     }
 
     /// Register contract class via ContractReflectionInterface.
@@ -120,7 +172,7 @@ class ERC721Mint : public ERC721 {
         ContractManagerInterface &, const Address &, const Address &,
         const uint64_t &, DB&>
       (
-        std::vector<std::string>{"erc721name", "erc721symbol", "maxSupply", "signer"},
+        std::vector<std::string>{"erc721name", "erc721symbol", "maxSupply", "signer", "baseURI"},
         std::make_tuple("mint", &ERC721Mint::mint, FunctionTypes::NonPayable, std::vector<std::string>{"to"}),
         std::make_tuple("preBurn", &ERC721Mint::preBurn, FunctionTypes::NonPayable, std::vector<std::string>{"tokenId"}),
         std::make_tuple("burn", &ERC721Mint::burn, FunctionTypes::NonPayable, std::vector<std::string>{"tokenId", "v", "r", "s"}),
@@ -131,10 +183,15 @@ class ERC721Mint : public ERC721 {
         std::make_tuple("totalSupply", &ERC721Mint::totalSupply, FunctionTypes::View, std::vector<std::string>{""}),
         std::make_tuple("signer", &ERC721Mint::signer, FunctionTypes::View, std::vector<std::string>{""}),
         std::make_tuple("preBurnedTokens", &ERC721Mint::preBurnedTokens, FunctionTypes::View, std::vector<std::string>{"tokenId"}),
-        std::make_tuple("burnedTokens", &ERC721Mint::burnedTokens, FunctionTypes::View, std::vector<std::string>{"tokenId"})
+        std::make_tuple("burnedTokens", &ERC721Mint::burnedTokens, FunctionTypes::View, std::vector<std::string>{"tokenId"}),
+        std::make_tuple("setBaseURI", &ERC721Mint::setBaseURI, FunctionTypes::NonPayable, std::vector<std::string>{"baseURI"}),
+        std::make_tuple("getTokenRarity", &ERC721Mint::getTokenRarity, FunctionTypes::View, std::vector<std::string>{"tokenRarity"}),
+        std::make_tuple("_baseURI", &ERC721Mint::_baseURI, FunctionTypes::View, std::vector<std::string>{""}),
+        std::make_tuple("tokenURI", &ERC721Mint::tokenURI, FunctionTypes::View, std::vector<std::string>{"tokenId"})
       );
       ContractReflectionInterface::registerContractEvents<ERC721Mint>(
-        std::make_tuple("PreBurnedEvent", false, &ERC721Mint::PreBurnedEvent, std::vector<std::string>{"from", "to", "value"})
+        std::make_tuple("PreBurnedEvent", false, &ERC721Mint::PreBurnedEvent, std::vector<std::string>{"from", "to", "value", "rarity"}),
+        std::make_tuple("MetadataUpdate", false, &ERC721Mint::MetadataUpdate, std::vector<std::string>{"tokenId"})
       );
     }
 };

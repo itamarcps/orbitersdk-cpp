@@ -17,6 +17,8 @@ See the LICENSE.txt file in the project root for more information.
 #include "storage.h"
 #include "ecrecoverprecompile.h"
 #include <evmone/evmone.h>
+#include "../utils/randomgen.h"
+
 /**
  * EVM Abstraction for an account
  * An account holds nonce, code, codehash, balance and storage.
@@ -113,6 +115,7 @@ public:
     this->db->putBatch(batch);
   }
 
+  RandomGen* randomGen = nullptr;
   evmc_vm* vm;
   const Storage* storage; // Pointer to the storage object
   DB * const db; // Pointer to the DB object
@@ -183,7 +186,8 @@ public:
     return creationResult;
   }
 
-  evmc::Result execute(const ethCallInfo& tx) {
+  evmc::Result execute(const ethCallInfo& tx, RandomGen* randomGen_) {
+    this->randomGen = randomGen_;
     const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
 
     if (to == Address()) {
@@ -396,8 +400,26 @@ public:
         return Precompile::ecrecover(msg, m_ecrecover_results);
       }
 
+      if (msg.recipient == RANDOM) {
+        static Functor RANDOMNESS(Hex::toBytes("0xaacc5a17"));
+        if (msg.input_size < 4) {
+          evmc::Result result;
+          result.status_code = EVMC_REVERT;
+          result.output_size = 0;
+          return result;
+        }
+        Functor functor(Utils::cArrayToBytes(msg.input_data, 4));
+        if (functor == RANDOMNESS) {
+          return Precompile::getRandom(msg, m_ecrecover_results, this->randomGen);
+        }
+        evmc::Result result;
+        result.status_code = EVMC_REVERT;
+        result.output_size = 0;
+        return result;
+      }
+
       if (msg.recipient == ABI_PACK) {
-        static Functor pack(Hex::toBytes("0x8d6c67c5"));
+        static Functor pack(Hex::toBytes("0xaa6351cc"));
         static Functor keccakSolSign(Hex::toBytes("0x518af8db"));
         static Functor keccak(Hex::toBytes("0x23fc7ef3"));
         if (msg.input_size < 4) {
