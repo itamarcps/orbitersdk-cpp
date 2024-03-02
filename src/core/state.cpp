@@ -433,17 +433,19 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
       }
       uint256_t realGasLimit = gasLimit;
       auto latestBlock = this->storage_.latest();
+      evmc::Result evmCallResult;
       if (gasLimit > std::numeric_limits<int64_t>::max() - 10) {
         auto newCallInfo = callInfo;
         realGasLimit = std::numeric_limits<int64_t>::max() - 10;
         std::get<2>(newCallInfo) = std::numeric_limits<int64_t>::max() - 10;
-        this->evmHost_.setTxContext(callInfo,
+        this->evmHost_.setTxContext(newCallInfo,
         latestBlock->hash(),
         latestBlock->getNHeight(),
         Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
         latestBlock->getTimestamp(),
         100000000,
-        this->options_.getChainID());
+        this->options_.getChainID())
+        evmCallResult = this->evmHost_.execute(newCallInfo, this->currentRandomGen_.get());
       } else {
         this->evmHost_.setTxContext(callInfo,
           latestBlock->hash(),
@@ -452,8 +454,8 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
           latestBlock->getTimestamp(),
           100000000,
           this->options_.getChainID());
+        evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
       }
-      auto evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
 
       // Revert EVERYTHING from the call.
       this->evmHost_.revert();
@@ -506,17 +508,19 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
     }
     uint256_t realGasLimit = gasLimit;
     auto latestBlock = this->storage_.latest();
+    evmc::Result evmCallResult;
     if (gasLimit > std::numeric_limits<int64_t>::max() - 10) {
       auto newCallInfo = callInfo;
       realGasLimit = std::numeric_limits<int64_t>::max() - 10;
       std::get<2>(newCallInfo) = std::numeric_limits<int64_t>::max() - 10;
-      this->evmHost_.setTxContext(callInfo,
+      this->evmHost_.setTxContext(newCallInfo,
       latestBlock->hash(),
       latestBlock->getNHeight(),
       Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
       latestBlock->getTimestamp(),
       100000000,
-      this->options_.getChainID());
+      this->options_.getChainID())
+      evmCallResult = this->evmHost_.execute(newCallInfo, this->currentRandomGen_.get());
     } else {
       this->evmHost_.setTxContext(callInfo,
         latestBlock->hash(),
@@ -525,8 +529,9 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
         latestBlock->getTimestamp(),
         100000000,
         this->options_.getChainID());
+      evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
     }
-    auto evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
+
     // Revert EVERYTHING from the call.
 
     this->evmHost_.revert(true);
