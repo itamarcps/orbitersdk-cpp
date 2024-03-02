@@ -345,7 +345,7 @@ void ERC721Mint::registerContractFunctions() {
   this->registerMemberFunction("_baseURI", &ERC721Mint::_baseURI, FunctionTypes::View, this);
   this->registerMemberFunction("tokenURI", &ERC721Mint::tokenURI, FunctionTypes::View, this);
   this->registerMemberFunction("getAllTokensOwnedByUser", &ERC721Mint::getAllTokensOwnedByUser, FunctionTypes::View, this);
-  this->registerMemberFunction("_preburnedTokensByOwner", &ERC721Mint::_preburnedTokensByOwner, FunctionTypes::View, this);
+  this->registerMemberFunction("getPreburnedTokensByOwner", &ERC721Mint::getPreburnedTokensByOwner, FunctionTypes::View, this);
 }
 
 void ERC721Mint::setBaseURI(const std::string& baseURI) {

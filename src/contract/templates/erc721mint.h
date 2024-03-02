@@ -94,7 +94,7 @@ class ERC721Mint : public ERC721 {
 
     void setBaseURI(const std::string& baseURI);
 
-    std::vector<uint256_t> _preburnedTokensByOwner(const Address& user) const {
+    std::vector<uint256_t> getPreburnedTokensByOwner(const Address& user) const {
       std::vector<uint256_t> tokens;
       auto it = this->preburnedTokensByOwner_.find(user);
       if (it != this->preburnedTokensByOwner_.end()) {
@@ -225,7 +225,7 @@ class ERC721Mint : public ERC721 {
         std::make_tuple("_baseURI", &ERC721Mint::_baseURI, FunctionTypes::View, std::vector<std::string>{""}),
         std::make_tuple("tokenURI", &ERC721Mint::tokenURI, FunctionTypes::View, std::vector<std::string>{"tokenId"}),
         std::make_tuple("getAllTokensOwnedByUser", &ERC721Mint::getAllTokensOwnedByUser, FunctionTypes::View, std::vector<std::string>{"user"}),
-        std::make_tuple("_preburnedTokensByOwner", &ERC721Mint::_preburnedTokensByOwner, FunctionTypes::View, std::vector<std::string>{"user"})
+        std::make_tuple("getPreburnedTokensByOwner", &ERC721Mint::getPreburnedTokensByOwner, FunctionTypes::View, std::vector<std::string>{"user"})
       );
       ContractReflectionInterface::registerContractEvents<ERC721Mint>(
         std::make_tuple("PreBurnedEvent", false, &ERC721Mint::PreBurnedEvent, std::vector<std::string>{"from", "to", "value", "rarity"}),
