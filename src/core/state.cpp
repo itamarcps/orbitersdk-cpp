@@ -431,14 +431,28 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
         this->evmHost_.accessedAccountsBalances.push_back(from);
         this->evmHost_.accessedAccountsBalances.push_back(realTo);
       }
+      uint256_t realGasLimit = gasLimit;
       auto latestBlock = this->storage_.latest();
-      this->evmHost_.setTxContext(callInfo,
+      if (gasLimit > std::numeric_limits<int64_t>::max() - 10) {
+        auto newCallInfo = callInfo;
+        realGasLimit = std::numeric_limits<int64_t>::max() - 10;
+        std::get<2>(newCallInfo) = std::numeric_limits<int64_t>::max() - 10;
+        this->evmHost_.setTxContext(callInfo,
         latestBlock->hash(),
         latestBlock->getNHeight(),
         Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
         latestBlock->getTimestamp(),
         100000000,
         this->options_.getChainID());
+      } else {
+        this->evmHost_.setTxContext(callInfo,
+          latestBlock->hash(),
+          latestBlock->getNHeight(),
+          Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
+          latestBlock->getTimestamp(),
+          100000000,
+          this->options_.getChainID());
+      }
       auto evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
 
       // Revert EVERYTHING from the call.
@@ -490,14 +504,28 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
       this->evmHost_.accessedAccountsBalances.push_back(from);
       this->evmHost_.accessedAccountsBalances.push_back(realTo);
     }
+    uint256_t realGasLimit = gasLimit;
     auto latestBlock = this->storage_.latest();
-    this->evmHost_.setTxContext(callInfo,
+    if (gasLimit > std::numeric_limits<int64_t>::max() - 10) {
+      auto newCallInfo = callInfo;
+      realGasLimit = std::numeric_limits<int64_t>::max() - 10;
+      std::get<2>(newCallInfo) = std::numeric_limits<int64_t>::max() - 10;
+      this->evmHost_.setTxContext(callInfo,
       latestBlock->hash(),
       latestBlock->getNHeight(),
       Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
       latestBlock->getTimestamp(),
       100000000,
       this->options_.getChainID());
+    } else {
+      this->evmHost_.setTxContext(callInfo,
+        latestBlock->hash(),
+        latestBlock->getNHeight(),
+        Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
+        latestBlock->getTimestamp(),
+        100000000,
+        this->options_.getChainID());
+    }
     auto evmCallResult = this->evmHost_.execute(callInfo, this->currentRandomGen_.get());
     // Revert EVERYTHING from the call.
 
@@ -514,7 +542,7 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
     if (evmCallResult.status_code) {
       throw DynamicException("Error when estimating gas, evmCallResult.status_code: " + std::string(evmc_status_code_to_string(evmCallResult.status_code)) + " bytes: " + Hex::fromBytes(Utils::cArrayToBytes(evmCallResult.output_data, evmCallResult.output_size)).get());
     }
-    auto gasUsed = gasLimit - evmCallResult.gas_left;
+    auto gasUsed = realGasLimit - evmCallResult.gas_left;
     return gasUsed + baseGas;
   }
 
