@@ -331,14 +331,14 @@ void ERC721Mint::mint(const Address& to) {
     throw DynamicException("MyTokenMintable: max supply reached");
   }
   // Mint the NFT to the user's provided address
+  uint256_t tokenCount = this->balanceOf(to);
   this->mint_(to, this->tokenIdCounter_.get());
 
-  uint256_t tokenCount = this->balanceOf(to);
   // Update the mapping to include the tokenID to an inde
-  _ownedTokens[to][tokenCount + 1] = tokenIdCounter_.get();
+  _ownedTokens[to][tokenCount] = tokenIdCounter_.get();
   // Update the mapping to include the index to a tokenID
 
-  _ownedTokensIndex[to][tokenIdCounter_.get()] = tokenCount+1;
+  _ownedTokensIndex[to][tokenIdCounter_.get()] = tokenCount;
 
   uint256_t randomNum = this->getNextRandom() % 10000;
   uint256_t rarity = 0;
