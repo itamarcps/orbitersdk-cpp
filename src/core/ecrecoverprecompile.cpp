@@ -5,12 +5,10 @@ namespace Precompile {
   evmc::Result ecrecover(const evmc_message& msg, std::vector<std::array<uint8_t, 32>>& addrs) noexcept {
     // We know that V is always a 32 bytes value containing either 27 or 28, extract this into a uint8_t, V is big endian
     evmc::Result result;
-    std::cout << "Called ecrecover precompile" << std::endl;
 
     try {
       // Check if the input data matches the required for ecrecover
       if (msg.input_size != 132) {
-        std::cerr << "Invalid input size for ecrecover precompile: " << msg.input_size << std::endl;
         result.status_code = EVMC_REVERT;
         result.output_size = 0;
         return result;
@@ -22,8 +20,6 @@ namespace Precompile {
       const auto v = uint8_t(Utils::bytesToUint256(BytesArrView(ecrecoverBytes.data() + 32, 32)));
       const auto r = Utils::bytesToUint256(BytesArrView(ecrecoverBytes.data() + 64, 32));
       const auto s = Utils::bytesToUint256(BytesArrView(ecrecoverBytes.data() + 96, 32));
-      std::cout << "ecrecover r: " << Hex::fromBytes(Utils::uint256ToBytes(r)) << std::endl;
-      std::cout << "ecrecover s: " << Hex::fromBytes(Utils::uint256ToBytes(s)) << std::endl;
       // Check if V is either 27 or 28
       if (v != 27 && v != 28) {
         std::cerr << "Invalid V value for ecrecover precompile V: " << v << std::endl;
@@ -64,7 +60,6 @@ namespace Precompile {
 
   evmc::Result packAndHash(const evmc_message& msg, std::vector<std::array<uint8_t, 32>>& hashs) noexcept {
     evmc::Result result;
-    std::cout << "PackAndHash" << std::endl;
     try {
       // Check if the input data matches the required for ecrecover
       if (msg.input_size != 100) {
@@ -84,9 +79,7 @@ namespace Precompile {
       Utils::appendBytes(value, Utils::uint256ToBytes(tokenId));
       Utils::appendBytes(value, user.asBytes());
       Utils::appendBytes(value, Utils::uint256ToBytes(rarity));
-      std::cout << "Packandhash value: " << Hex::fromBytes(value) << std::endl;
       auto keccakHash = Utils::sha3(value);
-      std::cout << "Packandhash hash: " << Hex::fromBytes(keccakHash.asBytes()) << std::endl;
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
       hashs.push_back(keccakHashArr);
@@ -123,9 +116,7 @@ namespace Precompile {
       value.insert(value.end(), '\n');
       Utils::appendBytes(value, std::to_string(32));
       Utils::appendBytes(value, hash);
-      std::cout << "keccakHash value: " << Hex::fromBytes(value) << std::endl;
       auto keccakHash = Utils::sha3(value);
-      std::cout << "keccakHash hash: " << Hex::fromBytes(hash.asBytes()) << std::endl;
       std::array<uint8_t, 32> keccakHashArr;
       std::copy(keccakHash.cbegin(), keccakHash.cend(), keccakHashArr.begin());
       hashs.push_back(keccakHashArr);

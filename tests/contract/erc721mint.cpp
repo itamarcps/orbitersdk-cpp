@@ -77,7 +77,6 @@ namespace TERC721 {
 
       auto hash = Utils::sha3(createMessage(tokenIdBurn, userBurn, userRarity));
       auto messageHash = _toTyped32ByteDataHash(hash);
-
       auto signature = Secp256k1::sign(messageHash, signerKey);
       const auto& r = signature.r();
       const auto& s = signature.s();

@@ -153,6 +153,7 @@ namespace JsonRPC {
     { "eth_call", eth_call },
     { "eth_estimateGas", eth_estimateGas },
     { "eth_gasPrice", eth_gasPrice },
+      { "eth_getLogs", eth_getLogs },
     { "eth_getBalance", eth_getBalance },
     { "eth_getTransactionCount", eth_getTransactionCount },
     { "eth_getCode", eth_getCode },

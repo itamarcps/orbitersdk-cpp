@@ -2,7 +2,8 @@ if(BUILD_AVALANCHEGO)
 
 else()
     add_library(rollup_validator_lib STATIC
-            ${CMAKE_SOURCE_DIR}/src/bins/rollup-validator/src/tmp.h
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-validator/src/signermanager.cpp
+            ${CMAKE_SOURCE_DIR}/src/bins/rollup-validator/src/signermanager.h
     )
 
     target_include_directories(rollup_validator_lib PRIVATE ${CMAKE_SOURCE_DIR}/include ${OPENSSL_INCLUDE_DIR} orbitersdk_lib)
