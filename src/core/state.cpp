@@ -444,7 +444,7 @@ Bytes State::ethCall(const ethCallInfo& callInfo) const {
         Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
         latestBlock->getTimestamp(),
         100000000,
-        this->options_.getChainID())
+        this->options_.getChainID());
         evmCallResult = this->evmHost_.execute(newCallInfo, this->currentRandomGen_.get());
       } else {
         this->evmHost_.setTxContext(callInfo,
@@ -519,7 +519,7 @@ uint256_t State::estimateGas(const ethCallInfo& callInfo) {
       Secp256k1::toAddress(latestBlock->getValidatorPubKey()),
       latestBlock->getTimestamp(),
       100000000,
-      this->options_.getChainID())
+      this->options_.getChainID());
       evmCallResult = this->evmHost_.execute(newCallInfo, this->currentRandomGen_.get());
     } else {
       this->evmHost_.setTxContext(callInfo,
