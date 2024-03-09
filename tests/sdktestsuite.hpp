@@ -103,6 +103,18 @@ class SDKTestSuite {
     }
 
     /**
+     * Get the chain owner account.
+     * @return The chain owner account.
+     */
+    void setRandomGen (RandomGen* randomGen) {
+      this->state_.setRandomGen(randomGen);
+    }
+
+    void callContract(const TxBlock& tx, const Hash& blockHash, const uint64_t& txIndex) {
+      this->state_.callContract(tx, blockHash, txIndex);
+    }
+
+    /**
      * Initialize all components of a full blockchain node.
      * @param sdkPath Path to the SDK folder.
      * @param accounts (optional) List of accounts to initialize the blockchain with. Defaults to none (empty vector).

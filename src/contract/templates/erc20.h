@@ -106,6 +106,8 @@ class ERC20 : public DynamicContract {
       DB& db
     );
 
+  std::vector<std::tuple<Address, uint256_t>> getAllBalances() const;
+
     /// Destructor.
     ~ERC20() override;
 

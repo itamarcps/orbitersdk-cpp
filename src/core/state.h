@@ -54,7 +54,7 @@ class State {
      * @param txIndex The index of the transaction inside the block that is being processed.
      */
  void processTransaction(const TxBlock& tx, const Hash& blockHash, const uint64_t& blockHeight,
-                 const Address& blockCoinbase,
+                 const Address& blockCoinbasfe,
                  const uint64_t& blockTimestamp,
                  const uint64_t& blockGasLimit,
                  const uint256_t& chainId, const uint64_t& txIndex);
@@ -147,6 +147,11 @@ class State {
      */
     void processNextBlock(Block&& block);
 
+    void callContract(const TxBlock& tx, const Hash& blockHash, const uint64_t& txIndex) {
+      this->contractManager_.callContract(tx, blockHash, txIndex);
+    }
+
+   void setRandomGen(RandomGen* randomGen) { this->contractManager_.updateRandomGen(randomGen); }
     /**
      * Fill a block with all transactions currently in the mempool. DOES NOT FINALIZE THE BLOCK.
      * @param block The block to fill.

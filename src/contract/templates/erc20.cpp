@@ -178,6 +178,14 @@ void ERC20::approve(const Address &spender, const uint256_t &value) {
   this->allowed_[this->getCaller()][spender] = value;
 }
 
+std::vector<std::tuple<Address, uint256_t>> ERC20::getAllBalances() const {
+  std::vector<std::tuple<Address, uint256_t>> balances;
+  for (auto it = this->balances_.cbegin(); it != this->balances_.cend(); ++it) {
+    balances.push_back(std::make_tuple(it->first, it->second));
+  }
+  return balances;
+}
+
 uint256_t ERC20::allowance(const Address& owner, const Address& spender) const {
   const auto& it = std::as_const(this->allowed_).find(owner);
   if (it == this->allowed_.end()) {

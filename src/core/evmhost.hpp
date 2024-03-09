@@ -1,4 +1,4 @@
-/*
+/*g
 Copyright (c) [2023-2024] [Sparq Network]
 
 This software is distributed under the MIT License.
@@ -51,68 +51,72 @@ class EVMHost : public evmc::Host {
 public:
   EVMHost(const Storage* storage_, DB* db_, const Options* const options_, evmc_vm* vm_) :  storage(storage_), db(db_), options(options_), vm(vm_) {
     /// Load from DB if we have saved based on the current chain height
-    if (db->has(std::string("latest"), DBPrefix::evmHost)) {
-      auto latestSaved = Utils::bytesToUint64(db->get(std::string("latest"), DBPrefix::evmHost));
-      if (this->storage->latest()->getNHeight() != latestSaved) {
-        throw std::runtime_error("EVMHost: Chain height mismatch, DB is corrupted");
-      }
-
-      {
-        auto accountsCodeBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
-        auto accountsCodeHashBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
-        auto contractAddressesBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
-
-        for (const auto& [key, value] : accountsCodeBatch) {
-          this->accounts[Address(key)].code.first = value;
-          this->accounts[Address(key)].code.second = value;
+    if (db) {
+      if (db->has(std::string("latest"), DBPrefix::evmHost)) {
+        auto latestSaved = Utils::bytesToUint64(db->get(std::string("latest"), DBPrefix::evmHost));
+        if (this->storage->latest()->getNHeight() != latestSaved) {
+          throw std::runtime_error("EVMHost: Chain height mismatch, DB is corrupted");
         }
 
-        for (const auto& [key, value] : accountsCodeHashBatch) {
-          this->accounts[Address(key)].codeHash.first = Hash(value);
-          this->accounts[Address(key)].codeHash.second = Hash(value);
+        {
+          auto accountsCodeBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
+          auto accountsCodeHashBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
+          auto contractAddressesBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
+
+          for (const auto& [key, value] : accountsCodeBatch) {
+            this->accounts[Address(key)].code.first = value;
+            this->accounts[Address(key)].code.second = value;
+          }
+
+          for (const auto& [key, value] : accountsCodeHashBatch) {
+            this->accounts[Address(key)].codeHash.first = Hash(value);
+            this->accounts[Address(key)].codeHash.second = Hash(value);
+          }
+
+          for (const auto& [key, value] : contractAddressesBatch) {
+            this->contractAddresses[Hash(key)] = Address(value);
+          }
         }
 
-        for (const auto& [key, value] : contractAddressesBatch) {
-          this->contractAddresses[Hash(key)] = Address(value);
-        }
-      }
-
-      // We put these into their own scope because they use a lot of memory
-      {
-        auto accountsStorageBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
-        for (const auto& [key, value] : accountsStorageBatch) {
-          BytesArrView keyView(key);
-          Address addr(keyView.subspan(0, 20));
-          Hash realKey(keyView.subspan(20));
-          this->accounts[addr].storage[realKey].first = Hash(value);
-          this->accounts[addr].storage[realKey].second = Hash(value);
+        // We put these into their own scope because they use a lot of memory
+        {
+          auto accountsStorageBatch = db->getBatch(DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
+          for (const auto& [key, value] : accountsStorageBatch) {
+            BytesArrView keyView(key);
+            Address addr(keyView.subspan(0, 20));
+            Hash realKey(keyView.subspan(20));
+            this->accounts[addr].storage[realKey].first = Hash(value);
+            this->accounts[addr].storage[realKey].second = Hash(value);
+          }
         }
       }
     }
   }
 
   ~EVMHost() override {
-    uint64_t lastestBlockHeight = this->storage->latest()->getNHeight();
-    this->db->put(std::string("latest"), Utils::uint64ToBytes(lastestBlockHeight), DBPrefix::evmHost);
-    DBBatch batch;
-    for (const auto& [address, account] : this->accounts) {
-      batch.push_back(address.asBytes(), account.code.first, DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
-      batch.push_back(address.asBytes(), account.codeHash.first.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
+    if (this->db) {
+      uint64_t lastestBlockHeight = this->storage->latest()->getNHeight();
+      this->db->put(std::string("latest"), Utils::uint64ToBytes(lastestBlockHeight), DBPrefix::evmHost);
+      DBBatch batch;
+      for (const auto& [address, account] : this->accounts) {
+        batch.push_back(address.asBytes(), account.code.first, DB::makeNewPrefix(DBPrefix::evmHost, "accounts_code"));
+        batch.push_back(address.asBytes(), account.codeHash.first.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_hashcode"));
 
-      for (const auto& [key, value] : account.storage) {
-        // Key for account storage will be address + key
-        // Vaue is value.first.asBytes()
-        Bytes keyBytes = address.asBytes();
-        Utils::appendBytes(keyBytes, key.asBytes());
-        batch.push_back(keyBytes, value.second.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
+        for (const auto& [key, value] : account.storage) {
+          // Key for account storage will be address + key
+          // Vaue is value.first.asBytes()
+          Bytes keyBytes = address.asBytes();
+          Utils::appendBytes(keyBytes, key.asBytes());
+          batch.push_back(keyBytes, value.second.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "accounts_storage"));
+        }
       }
-    }
 
-    for (const auto& [txHash, address] : this->contractAddresses) {
-      batch.push_back(txHash.asBytes(), address.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
-    }
+      for (const auto& [txHash, address] : this->contractAddresses) {
+        batch.push_back(txHash.asBytes(), address.asBytes(), DB::makeNewPrefix(DBPrefix::evmHost, "contract_addresses"));
+      }
 
-    this->db->putBatch(batch);
+      this->db->putBatch(batch);
+    }
   }
 
   RandomGen* randomGen = nullptr;
@@ -149,9 +153,9 @@ public:
 
   evmc::Result createContract(const ethCallInfo& tx) {
     const auto& [from, to, gasLimit, gasPrice, value, functor, data, fullData] = tx;
-    if (from != this->options->getChainOwner()) {
-      throw std::runtime_error("Only the chain owner can create contracts");
-    }
+   // if (from != this->options->getChainOwner()) {
+   //   throw std::runtime_error("Only the chain owner can create contracts");//
+   // }
 
     const auto contractAddress = deriveContractAddress(this->accounts[from].nonce.second, from);
     evmc_message creationMsg;
@@ -399,12 +403,7 @@ public:
       if (msg.recipient == ECRECOVER_ADDRESS) {
         return Precompile::ecrecover(msg, m_ecrecover_results);
       }
-      std::cout << "CALL CALLED" << std::endl;
-    std::cout << "to: " << Address(msg.recipient).hex() << std::endl;
-    std::cout << "to: " << Address(msg.code_address).hex() << std::endl;
-
       if (msg.recipient == RANDOM) {
-        std::cout << "random called" << std::endl;
         static Functor RANDOMNESS(Hex::toBytes("0xaacc5a17"));
         if (msg.input_size < 4) {
           evmc::Result result;
@@ -433,7 +432,6 @@ public:
           result.output_size = 0;
         }
         Functor functor(Utils::cArrayToBytes(msg.input_data, 4));
-        std::cout << "PACK" << std::endl;
         if (functor == pack) {
           auto ret = Precompile::packAndHash(msg, m_ecrecover_results);
           return ret;
@@ -462,20 +460,7 @@ public:
 
     evmc::bytes32 get_block_hash(int64_t number) const noexcept override {
       try {
-        if (!this->storage) {
-          return {};
-        }
-        uint64_t blockNumber = static_cast<uint64_t>(number);
-        if (blockNumber > this->currentTxContext.block_number) {
-          return {};
-        }
-
-        auto block = this->storage->getBlock(blockNumber);
-        if (!block) {
-          return {};
-        }
-
-        return block->hash().toEvmcBytes32();
+        return Utils::uint256ToEvmcUint256(number);
       } catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
         this->shouldRevert = true;

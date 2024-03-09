@@ -271,10 +271,6 @@ namespace JsonRPC::Decoding {
             if (!std::regex_match(block, numFilter)) throw DynamicException(
               "Invalid block number"
             );
-            auto blockNum = uint64_t(Hex(block).getUint());
-            if (blockNum != storage.latest()->getNHeight()) throw DynamicException(
-              "Only latest block is supported"
-            );
           }
         }
       } else if (request["params"].is_object()) {
@@ -346,10 +342,6 @@ namespace JsonRPC::Decoding {
           if (block != "latest") {
             if (!std::regex_match(block, numFilter)) throw DynamicException(
               "Invalid block number"
-            );
-            auto blockNum = uint64_t(Hex(block).getUint());
-            if (blockNum != storage.latest()->getNHeight()) throw DynamicException(
-              "Only latest block is supported"
             );
           }
         }
@@ -509,10 +501,6 @@ namespace JsonRPC::Decoding {
         if (!std::regex_match(block, numFilter)) throw DynamicException(
           "Invalid block number"
         );
-        auto blockNum = uint64_t(Hex(block).getUint());
-        if (blockNum != storage.latest()->getNHeight()) throw DynamicException(
-          "Only latest block is supported"
-        );
       }
       if (!std::regex_match(address, addFilter)) throw DynamicException("Invalid address hex");
       return Address(Hex::toBytes(address));
@@ -534,10 +522,6 @@ namespace JsonRPC::Decoding {
         if (!std::regex_match(block, numFilter)) throw DynamicException(
           "Invalid block number"
         );
-        auto blockNum = uint64_t(Hex(block).getUint());
-        if (blockNum != storage.latest()->getNHeight()) throw DynamicException(
-          "Only latest block is supported"
-        );
       }
       if (!std::regex_match(address, addFilter)) throw DynamicException("Invalid address hex");
       return Address(Hex::toBytes(address));
@@ -558,10 +542,6 @@ namespace JsonRPC::Decoding {
       if (block != "latest") {
         if (!std::regex_match(block, numFilter)) throw DynamicException(
           "Invalid block number"
-        );
-        auto blockNum = uint64_t(Hex(block).getUint());
-        if (blockNum != storage.latest()->getNHeight()) throw DynamicException(
-          "Only latest block is supported"
         );
       }
       if (!std::regex_match(address, addFilter)) throw DynamicException("Invalid address hex");
